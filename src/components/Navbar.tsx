@@ -1,16 +1,16 @@
 import React from "react";
 import {
-  Laptop,
   Menu,
   Plus,
   Trash2,
   Volume2,
   VolumeX,
   LogOut,
-  User,
-  Shield,
+  Terminal,
+  Camera,
+  Cpu,
 } from "lucide-react";
-import { AppSettings, UserProfile } from "../types";
+import { AppSettings, DashboardTab, UserProfile } from "../types";
 import { BrandLogo } from "./BrandLogo";
 
 interface NavbarProps {
@@ -22,6 +22,8 @@ interface NavbarProps {
   onToggleSpeech: () => void;
   currentUser: UserProfile | null;
   onLogout: () => void;
+  activeTab: DashboardTab;
+  onSelectTab: (tab: DashboardTab) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -33,6 +35,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleSpeech,
   currentUser,
   onLogout,
+  activeTab,
+  onSelectTab,
 }) => {
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-800 bg-[#070e1b]/95 px-3 md:px-5 backdrop-blur-md text-slate-100">
@@ -58,39 +62,91 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="font-extrabold tracking-wide text-white text-lg md:text-xl">
                 DARBS
               </span>
-              <span className="hidden sm:inline-flex items-center rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-400 border border-cyan-500/20">
-                Laptop Troubleshooter
+              <span className="hidden xl:inline-flex items-center rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-400 border border-cyan-500/20">
+                Diagnostic Assistant
               </span>
             </div>
-            <p className="hidden md:block text-[10px] text-slate-400 tracking-tight">
+            <p className="hidden xl:block text-[10px] text-slate-400 tracking-tight">
               Diagnostic Assistant for Repair, Bugs and Support
             </p>
           </div>
         </div>
       </div>
 
-      {/* Right side controls: New Chat, Delete History, Read/Speech Toggle, User Badge, Exit/Logout */}
-      <div className="flex items-center gap-1.5 md:gap-2">
-        {/* New Chat Session */}
+      {/* Center: Dashboard Main Navigation Tabs */}
+      <div className="flex items-center rounded-2xl border border-slate-800 bg-slate-950/80 p-1 shadow-inner">
         <button
-          id="btn-navbar-new-chat"
-          onClick={onNewChat}
-          className="flex items-center gap-1.5 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-cyan-500 transition-colors"
-          title="New Diagnostic Chat"
+          type="button"
+          onClick={() => onSelectTab("chat")}
+          className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+            activeTab === "chat"
+              ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-500/20"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
+          }`}
+          title="Diagnostic Chat Workspace"
         >
-          <Plus className="h-4 w-4" />
-          <span className="hidden md:inline">New Chat</span>
+          <Terminal className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Diagnostic Chat</span>
+          <span className="sm:hidden">Chat</span>
         </button>
 
-        {/* Delete History Button */}
         <button
-          id="btn-navbar-delete-history"
-          onClick={onOpenDeleteModal}
-          className="rounded-lg border border-red-900/60 bg-red-950/40 p-2 text-red-400 hover:bg-red-900/60 hover:text-red-300 transition-colors"
-          title="Delete Chat History"
+          type="button"
+          onClick={() => onSelectTab("image_studio")}
+          className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+            activeTab === "image_studio"
+              ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-500/20"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
+          }`}
+          title="Hardware Photo & Diagram Generator"
         >
-          <Trash2 className="h-4 w-4" />
+          <Camera className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Photo Generator</span>
+          <span className="sm:hidden">Photos</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => onSelectTab("smart_tools")}
+          className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+            activeTab === "smart_tools"
+              ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-500/20"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
+          }`}
+          title="Technical Diagnostic Utilities"
+        >
+          <Cpu className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Smart Tools</span>
+          <span className="sm:hidden">Tools</span>
+        </button>
+      </div>
+
+      {/* Right side controls: New Chat, Delete History, Read/Speech Toggle, User Badge, Exit/Logout */}
+      <div className="flex items-center gap-1.5 md:gap-2">
+        {/* New Chat Session (Available on Chat tab) */}
+        {activeTab === "chat" && (
+          <button
+            id="btn-navbar-new-chat"
+            onClick={onNewChat}
+            className="flex items-center gap-1.5 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-cyan-500 transition-colors"
+            title="New Diagnostic Chat"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden lg:inline">New Chat</span>
+          </button>
+        )}
+
+        {/* Delete History Button */}
+        {activeTab === "chat" && (
+          <button
+            id="btn-navbar-delete-history"
+            onClick={onOpenDeleteModal}
+            className="rounded-lg border border-red-900/60 bg-red-950/40 p-2 text-red-400 hover:bg-red-900/60 hover:text-red-300 transition-colors"
+            title="Delete Chat History"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
 
         {/* Speaking Read Button (Turn On / Off) */}
         <button
@@ -108,26 +164,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           }
         >
           {settings.speechEnabled ? (
-            <>
-              <Volume2 className="h-4 w-4 text-cyan-400 animate-pulse" />
-              <span className="hidden lg:inline text-[11px] font-medium text-cyan-300">
-                Voice ON
-              </span>
-            </>
+            <Volume2 className="h-4 w-4 text-cyan-300" />
           ) : (
-            <>
-              <VolumeX className="h-4 w-4 text-slate-400" />
-              <span className="hidden lg:inline text-[11px] font-medium text-slate-400">
-                Voice OFF
-              </span>
-            </>
+            <VolumeX className="h-4 w-4" />
           )}
         </button>
 
-        {/* User Technician Profile Badge */}
+        {/* User Profile Avatar with sign-out option */}
         {currentUser && (
-          <div className="hidden sm:flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/80 px-2.5 py-1 text-xs">
-            <div className="relative flex h-7 w-7 items-center justify-center rounded-lg overflow-hidden border border-cyan-500/40 bg-slate-800 text-white font-bold text-[10px] shadow-sm">
+          <div className="flex items-center gap-2 pl-1 border-l border-slate-800">
+            <div
+              className="relative flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden border border-cyan-500/40 bg-slate-800 text-white font-bold text-xs shadow-sm"
+              title={`${currentUser.name} (${currentUser.email || currentUser.role})`}
+            >
               {currentUser.avatar ? (
                 <img
                   src={currentUser.avatar}
@@ -136,30 +185,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <BrandLogo alt="Technician profile" />
+                <BrandLogo alt={`${currentUser.name} avatar`} />
               )}
             </div>
-            <div className="text-left leading-tight">
-              <div className="font-semibold text-slate-200 text-[11px] truncate max-w-[100px]">
-                {currentUser.name}
-              </div>
-              <div className="text-[9px] text-cyan-400 truncate max-w-[100px]">
-                {currentUser.role}
-              </div>
-            </div>
+            <button
+              onClick={onLogout}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-red-950/40 hover:text-red-400 transition-colors"
+              title="Sign Out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         )}
-
-        {/* Logout / Exit Button */}
-        <button
-          id="btn-navbar-logout"
-          onClick={onLogout}
-          className="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800/80 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:bg-red-950/40 hover:text-red-300 hover:border-red-800/50 transition-colors"
-          title="Sign Out to Login Portal"
-        >
-          <LogOut className="h-4 w-4" />
-          <span className="hidden sm:inline">Sign Out</span>
-        </button>
       </div>
     </header>
   );

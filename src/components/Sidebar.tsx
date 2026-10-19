@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  Laptop,
   Plus,
   Trash2,
   Search,
@@ -8,11 +7,16 @@ import {
   Globe,
   Terminal,
   LogOut,
-  User,
-  Shield,
+  Camera,
+  Cpu,
+  Layers,
+  Wrench,
+  CloudCheck,
+  CheckCircle,
 } from "lucide-react";
-import { AppSettings, ChatSession, UserProfile } from "../types";
+import { AppSettings, ChatSession, DashboardTab, PersonaType, UserProfile } from "../types";
 import { BrandLogo } from "./BrandLogo";
+import { PERSONA_CONFIGS } from "../data/prompts";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -27,6 +31,9 @@ interface SidebarProps {
   onOpenExitModal: () => void;
   currentUser: UserProfile | null;
   onLogout: () => void;
+  activeTab: DashboardTab;
+  onSelectTab: (tab: DashboardTab) => void;
+  onSelectPersona: (persona: PersonaType) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -42,12 +49,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenExitModal,
   currentUser,
   onLogout,
+  activeTab,
+  onSelectTab,
+  onSelectPersona,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredSessions = sessions.filter((session) =>
     session.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const personas: PersonaType[] = [
+    "hardware_laptop",
+    "windows_bsod",
+    "performance_storage",
+    "network_wifi",
+    "driver_software",
+  ];
 
   return (
     <>
@@ -122,23 +140,79 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* Start New Diagnostic Chat */}
+        {/* Primary Dashboard Navigation Links */}
+        <div className="px-3 pt-3 space-y-1">
+          <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+            Navigation
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              onSelectTab("chat");
+              onClose();
+            }}
+            className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+              activeTab === "chat"
+                ? "bg-cyan-600/20 text-cyan-300 border border-cyan-500/50 shadow-sm"
+                : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+            }`}
+          >
+            <Terminal className="h-4 w-4 text-cyan-400" />
+            <span>Diagnostic Workspace</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              onSelectTab("image_studio");
+              onClose();
+            }}
+            className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+              activeTab === "image_studio"
+                ? "bg-cyan-600/20 text-cyan-300 border border-cyan-500/50 shadow-sm"
+                : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+            }`}
+          >
+            <Camera className="h-4 w-4 text-cyan-400" />
+            <span>Photo & Diagram Generator</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              onSelectTab("smart_tools");
+              onClose();
+            }}
+            className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+              activeTab === "smart_tools"
+                ? "bg-cyan-600/20 text-cyan-300 border border-cyan-500/50 shadow-sm"
+                : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+            }`}
+          >
+            <Cpu className="h-4 w-4 text-cyan-400" />
+            <span>Smart Tech Utilities</span>
+          </button>
+        </div>
+
+        {/* Start New Diagnostic Chat Button */}
         <div className="p-3">
           <button
             id="btn-sidebar-new-chat"
             onClick={() => {
+              onSelectTab("chat");
               onNewChat();
               onClose();
             }}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 py-2.5 px-4 font-semibold text-white shadow-md shadow-cyan-500/20 hover:from-cyan-500 hover:to-blue-500 transition-all text-xs"
           >
             <Plus className="h-4 w-4" />
-            New Diagnostic Chat
+            New Diagnostic Session
           </button>
         </div>
 
         {/* Search Session input */}
-        <div className="px-3 pt-1 pb-2">
+        <div className="px-3 pb-2">
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
             <input
@@ -152,7 +226,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Diagnostic History List */}
-        <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
+        <div className="flex-1 overflow-y-auto px-3 py-1 space-y-1">
           <div className="flex items-center justify-between px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
             <span>Diagnostic History ({filteredSessions.length})</span>
           </div>
@@ -166,11 +240,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div
                 key={session.id}
                 className={`group flex items-center justify-between rounded-xl px-3 py-2 transition-all text-xs cursor-pointer ${
-                  session.id === currentSessionId
+                  session.id === currentSessionId && activeTab === "chat"
                     ? "bg-slate-800/90 text-cyan-300 shadow-sm border border-cyan-500/40 font-semibold"
                     : "text-slate-400 hover:bg-slate-900/60 hover:text-slate-200"
                 }`}
                 onClick={() => {
+                  onSelectTab("chat");
                   onSelectSession(session.id);
                   onClose();
                 }}
@@ -186,7 +261,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       onDeleteSession(session.id);
                     }}
                     className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-400 transition-opacity"
-                    title="Delete Chat"
+                    title="Delete Session"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -196,21 +271,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
+        {/* Diagnostic Persona Switcher */}
+        <div className="border-t border-slate-800 px-3 py-2.5 space-y-1.5">
+          <div className="px-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+            Diagnostic Persona
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            {personas.map((p) => {
+              const isSelected = settings.persona === p;
+              const config = PERSONA_CONFIGS[p];
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => onSelectPersona(p)}
+                  className={`rounded-lg p-1.5 text-left text-[10px] border transition-all truncate ${
+                    isSelected
+                      ? "border-cyan-500/80 bg-cyan-950/60 text-cyan-300 font-bold shadow-xs"
+                      : "border-slate-800 bg-slate-900/50 text-slate-400 hover:text-slate-200"
+                  }`}
+                  title={config.name}
+                >
+                  <span className="truncate block">{config.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Footer info & exit */}
         <div className="border-t border-slate-800 p-3 space-y-2">
-          {/* Grounding Status Indicator */}
-          <div className="flex items-center justify-between rounded-lg bg-slate-900/80 p-2 text-xs text-slate-300">
-            <div className="flex items-center gap-2">
-              <Globe className="h-3.5 w-3.5 text-cyan-400" />
-              <span>Search Grounding:</span>
+          {/* Cloud Sync & Grounding Status */}
+          <div className="flex items-center justify-between rounded-lg bg-slate-900/80 p-2 text-[11px] text-slate-300">
+            <div className="flex items-center gap-1.5">
+              <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
+              <span>Cloud Firestore:</span>
             </div>
-            <span
-              className={`font-semibold ${
-                settings.enableWebSearch ? "text-cyan-400" : "text-slate-500"
-              }`}
-            >
-              {settings.enableWebSearch ? "Enabled" : "Off"}
-            </span>
+            <span className="font-semibold text-emerald-400">Active</span>
           </div>
 
           {/* Delete All History Button */}

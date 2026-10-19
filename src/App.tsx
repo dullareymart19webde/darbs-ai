@@ -6,8 +6,10 @@ import { ChatInput } from "./components/ChatInput";
 import { DeleteHistoryModal } from "./components/DeleteHistoryModal";
 import { ExitModal } from "./components/ExitModal";
 import { LoginPortal } from "./components/LoginPortal";
+import { ImageStudio } from "./components/ImageStudio";
+import { SmartToolsPanel } from "./components/SmartToolsPanel";
 import { BrandLogo } from "./components/BrandLogo";
-import { AppSettings, ChatMessage, ChatSession, UserProfile } from "./types";
+import { AppSettings, ChatMessage, ChatSession, DashboardTab, PersonaType, UserProfile } from "./types";
 import { speechController } from "./utils/speech";
 import { RotateCcw, LogOut } from "lucide-react";
 import { onAuthStateChange, logOutUser } from "./services/auth";
@@ -106,6 +108,7 @@ export default function App() {
   const [isExitedView, setIsExitedView] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<DashboardTab>("chat");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -429,6 +432,9 @@ export default function App() {
         onOpenExitModal={() => setIsExitModalOpen(true)}
         currentUser={currentUser}
         onLogout={handleLogout}
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
+        onSelectPersona={(persona) => setSettings((prev) => ({ ...prev, persona }))}
       />
 
       {/* Main Container */}
@@ -442,9 +448,11 @@ export default function App() {
           onToggleSpeech={handleToggleGlobalSpeech}
           currentUser={currentUser}
           onLogout={handleLogout}
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
         />
 
-        {/* Exited Workspace Screen or Active Chat View */}
+        {/* Exited Workspace Screen, Photo Generator, Smart Tools, or Active Diagnostic Chat */}
         {isExitedView ? (
           <main className="flex flex-1 flex-col items-center justify-center p-6 text-center">
             <div className="max-w-md space-y-4 rounded-3xl border border-slate-800 bg-[#0b1429] p-8 shadow-2xl">
@@ -474,6 +482,24 @@ export default function App() {
                 </button>
               </div>
             </div>
+          </main>
+        ) : activeTab === "image_studio" ? (
+          <main className="flex flex-1 flex-col overflow-hidden">
+            <ImageStudio
+              onSendImageToChat={(imageUrl, prompt) => {
+                setActiveTab("chat");
+                handleSendMessage(prompt, imageUrl);
+              }}
+            />
+          </main>
+        ) : activeTab === "smart_tools" ? (
+          <main className="flex flex-1 flex-col overflow-hidden">
+            <SmartToolsPanel
+              onSendResultToChat={(result) => {
+                setActiveTab("chat");
+                handleSendMessage(result);
+              }}
+            />
           </main>
         ) : (
           <main className="flex flex-1 flex-col overflow-hidden">

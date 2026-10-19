@@ -5,6 +5,8 @@ export type PersonaType =
   | "network_wifi"
   | "driver_software";
 
+export type DashboardTab = "chat" | "image_studio" | "smart_tools";
+
 export interface WebSource {
   title: string;
   url: string;

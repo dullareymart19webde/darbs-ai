@@ -307,25 +307,56 @@ app.post("/api/generate-image", async (req, res) => {
     }
 
     const ai = getGeminiClient();
-    const response = await ai.interactions.create({
-      model: GEMINI_IMAGE_MODEL,
-      input: prompt.trim(),
-      response_format: {
-        type: "image",
-        mime_type: "image/png",
-        aspect_ratio: aspectRatio,
-      },
-    });
-
-    if (!response.output_image?.data) {
-      return res.status(502).json({
-        error: "Gemini returned no image. Try a different prompt.",
+    
+    // Tier 1: Try interactions.create with configured model
+    try {
+      const response = await ai.interactions.create({
+        model: GEMINI_IMAGE_MODEL,
+        input: prompt.trim(),
+        response_format: {
+          type: "image",
+          mime_type: "image/png",
+          aspect_ratio: aspectRatio,
+        },
       });
+
+      if (response.output_image?.data) {
+        return res.json({
+          imageUrl: `data:${response.output_image.mime_type || "image/png"};base64,${response.output_image.data}`,
+          caption: response.output_text || null,
+        });
+      }
+    } catch (err1: any) {
+      console.warn(`interactions.create failed with ${GEMINI_IMAGE_MODEL}:`, err1?.message);
     }
 
-    res.json({
-      imageUrl: `data:${response.output_image.mime_type || "image/png"};base64,${response.output_image.data}`,
-      caption: response.output_text || null,
+    // Tier 2: Try ai.models.generateImages with imagen models
+    const fallbackModels = ["imagen-3.0-generate-002", "imagen-4.0-generate-001", "imagen-3.0-generate-001"];
+    for (const modelName of fallbackModels) {
+      try {
+        const response2 = await ai.models.generateImages({
+          model: modelName,
+          prompt: prompt.trim(),
+          config: {
+            numberOfImages: 1,
+            aspectRatio: aspectRatio === "16:9" ? "16:9" : aspectRatio === "4:3" ? "4:3" : aspectRatio === "9:16" ? "9:16" : "1:1",
+          },
+        });
+
+        const b64 = response2.generatedImages?.[0]?.image?.imageBytes;
+        if (b64) {
+          return res.json({
+            imageUrl: `data:image/png;base64,${b64}`,
+            caption: null,
+          });
+        }
+      } catch (errFallback: any) {
+        console.warn(`Fallback image generation failed with ${modelName}:`, errFallback?.message);
+      }
+    }
+
+    return res.status(502).json({
+      error: "Unable to generate image at this time. Please check your Gemini API key permissions or try a simpler prompt.",
     });
   } catch (error: any) {
     console.error("Error in /api/generate-image:", error);
