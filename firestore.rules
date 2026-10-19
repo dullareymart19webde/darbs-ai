@@ -1,0 +1,177 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: /users/{userId}
+// Document ID: Firebase Auth UID (request.auth.uid)
+// Description: User profile and technician credentials
+// Fields:
+//   - displayName: string (required, 1-100 chars) - Technician/user display name
+//   - email: string (required, valid email format, 1-255 chars) - User email address
+//   - role: string (required, 1-100 chars, immutable on update) - User role
+//   - avatar: string | null (optional, <= 2048 chars) - Profile picture URL or null
+//   - createdAt: timestamp | string (required, <= 100 chars if string, immutable on update)
+//   - updatedAt: timestamp | string (required, <= 100 chars if string)
+//   - id: string (optional, must match userId, immutable on update)
+//
+// Subcollection: /users/{userId}/sessions/{sessionId}
+// Document ID: Client-generated or Firestore session ID
+// Description: Diagnostic chat sessions and message history
+// Fields:
+//   - id: string (required, matches sessionId, <= 100 chars) - Session identifier
+//   - title: string (required, 1-500 chars) - Chat session title
+//   - createdAt: timestamp | string (required, <= 100 chars if string, immutable on update)
+//   - updatedAt: timestamp | string (required, <= 100 chars if string)
+//   - updatedAtMs: number (optional, non-negative integer/float, used for query sorting)
+//   - syncedAt: timestamp (optional) - Server sync timestamp
+//   - persona: string (required, valid persona enum) - AI technician persona
+//   - messages: list (required, max 500 items) - Ordered array of chat messages
+//       Each message object typically contains:
+//         - id: string
+//         - role: "user" | "assistant"
+//         - content: string
+//         - timestamp: string
+//         - optional: imageUrl, audioUrl, audioDuration, isVoiceMessage, sources, etc.
+//
+// Default Deny:
+//   - All unspecified collections and root documents are strictly denied.
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Check if the request is from an authenticated user
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if the authenticated user owns the resource based on path UID
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Validate email format using standard RFC-compliant regex
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
+    }
+
+    // Validate bounded string length
+    function isValidString(val, minLen, maxLen) {
+      return val is string &&
+        val.size() >= minLen &&
+        val.size() <= maxLen;
+    }
+
+    // Validate optional string or null field with length limit
+    function isValidOptionalString(data, field, maxLen) {
+      return !(field in data) ||
+        data[field] == null ||
+        (data[field] is string && data[field].size() <= maxLen);
+    }
+
+    // Validate timestamp or bounded ISO date string
+    function isValidTimestampOrDateString(val) {
+      return val is timestamp ||
+        (val is string && val.size() >= 1 && val.size() <= 100);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    // Validate User Profile Document Schema and Constraints
+    function isValidUser(data, userId) {
+      let allowedKeys = ['displayName', 'email', 'role', 'avatar', 'createdAt', 'updatedAt', 'id'];
+      let requiredKeys = ['displayName', 'email', 'role', 'createdAt', 'updatedAt'];
+
+      return data.keys().hasAll(requiredKeys) &&
+        data.keys().hasOnly(allowedKeys) &&
+        isValidString(data.displayName, 1, 100) &&
+        isValidEmail(data.email) && data.email.size() <= 255 &&
+        isValidString(data.role, 1, 100) &&
+        isValidOptionalString(data, 'avatar', 2048) &&
+        isValidTimestampOrDateString(data.createdAt) &&
+        isValidTimestampOrDateString(data.updatedAt) &&
+        (!('id' in data) || (data.id is string && data.id == userId));
+    }
+
+    // Validate Chat Session Document Schema and Constraints
+    function isValidSession(data, sessionId) {
+      let allowedKeys = ['id', 'title', 'createdAt', 'updatedAt', 'updatedAtMs', 'syncedAt', 'persona', 'messages'];
+      let requiredKeys = ['id', 'title', 'createdAt', 'updatedAt', 'persona', 'messages'];
+      let validPersonas = [
+        'hardware_laptop',
+        'windows_bsod',
+        'performance_storage',
+        'network_wifi',
+        'driver_software'
+      ];
+
+      return data.keys().hasAll(requiredKeys) &&
+        data.keys().hasOnly(allowedKeys) &&
+        data.id is string && data.id == sessionId && data.id.size() <= 100 &&
+        isValidString(data.title, 1, 500) &&
+        isValidTimestampOrDateString(data.createdAt) &&
+        isValidTimestampOrDateString(data.updatedAt) &&
+        data.persona is string && data.persona in validPersonas &&
+        data.messages is list && data.messages.size() <= 500 &&
+        (!('updatedAtMs' in data) || (data.updatedAtMs is number && data.updatedAtMs >= 0)) &&
+        (!('syncedAt' in data) || data.syncedAt is timestamp);
+    }
+
+    // ===============================================================
+    // Rules Definition
+    // ===============================================================
+
+    // Root users collection: /users/{userId}
+    match /users/{userId} {
+      // Read: Authenticated owner only (PII protected)
+      allow read: if isOwner(userId);
+
+      // Create: Authenticated owner only, strictly validated
+      allow create: if isOwner(userId) &&
+                       isValidUser(request.resource.data, userId);
+
+      // Update: Authenticated owner only, schema validated, role & createdAt immutable
+      allow update: if isOwner(userId) &&
+                       isValidUser(request.resource.data, userId) &&
+                       request.resource.data.createdAt == resource.data.createdAt &&
+                       request.resource.data.role == resource.data.role &&
+                       (!('id' in resource.data) || !('id' in request.resource.data) || request.resource.data.id == resource.data.id);
+
+      // Delete: Authenticated owner only
+      allow delete: if isOwner(userId);
+
+      // User Diagnostic Chat Sessions Subcollection: /users/{userId}/sessions/{sessionId}
+      match /sessions/{sessionId} {
+        // Read: Authenticated owner only
+        allow read: if isOwner(userId);
+
+        // Create: Authenticated owner only, strictly validated
+        allow create: if isOwner(userId) &&
+                         isValidSession(request.resource.data, sessionId);
+
+        // Update: Authenticated owner only, schema validated, id & createdAt immutable
+        allow update: if isOwner(userId) &&
+                         isValidSession(request.resource.data, sessionId) &&
+                         request.resource.data.id == resource.data.id &&
+                         request.resource.data.createdAt == resource.data.createdAt;
+
+        // Delete: Authenticated owner only
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    // Default Deny Rule: Block all access to any other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -16,3 +16,4 @@ services:
         value: gemini-3.8-flash-tts
       - key: GEMINI_IMAGE_MODEL
         value: gemini-nano-banana-2.1
+

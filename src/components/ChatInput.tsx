@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import {
   Send,
   Globe,
-  Sparkles,
+  Terminal,
   RefreshCw,
   Image as ImageIcon,
   Mic,
@@ -318,7 +318,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         {showStarterChips && (
           <div className="space-y-2">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-cyan-400">
-              <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+              <Terminal className="h-3.5 w-3.5 text-cyan-400" />
               <span>Common Diagnostic & Repair Workflows:</span>
             </div>
             <div className="flex flex-wrap gap-2">

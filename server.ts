@@ -55,16 +55,16 @@ function generateOfflineDiagnosticFallback(
     q.includes("minidump") ||
     persona === "windows_bsod"
   ) {
-    return `### 🔍 DARBS Blue Screen (BSOD) Diagnostic & Recovery Guide
+    return `### [DIAGNOSTIC GUIDE] DARBS Blue Screen (BSOD) Diagnostic & Recovery Guide
 
 I analyzed your crash symptoms. Blue Screen errors typically stem from corrupt kernel files, faulty drivers (especially GPU/Wi-Fi), or bad RAM modules.
 
 ---
 
-### 🛠️ Step-by-Step Fix Protocol:
+### Step-by-Step Fix Protocol:
 
 #### 1. System File & Image Verification
-Open **Command Prompt as Administrator** (**Win + S**, type \`cmd\`, right-click ➔ *Run as Administrator*):
+Open **Command Prompt as Administrator** (**Win + S**, type \`cmd\`, right-click -> *Run as Administrator*):
 \`\`\`cmd
 DISM /Online /Cleanup-Image /RestoreHealth
 sfc /scannow
@@ -79,16 +79,16 @@ Locate crash dumps in: \`C:\\Windows\\Minidump\\\`
 Use **BlueScreenView** or **WinDbg** to pinpoint the exact \`.sys\` driver causing the crash.
 
 ---
-> 💡 **DARBS Advisory**: If the BSOD started after a recent update, boot into Safe Mode (**Shift + Restart**) and roll back the driver in Device Manager.`;
+> [ADVISORY]: If the BSOD started after a recent update, boot into Safe Mode (**Shift + Restart**) and roll back the driver in Device Manager.`;
   }
 
-  return `### 💻 DARBS Diagnostic Analysis & System Troubleshooting
+  return `### [DIAGNOSTIC REPORT] DARBS Diagnostic Analysis & System Troubleshooting
 
 I have analyzed your query regarding **"${userQuery.slice(0, 60)}"**. Here is the recommended diagnostic workflow:
 
 ---
 
-### 🛠️ Universal First-Response Diagnostic Protocol:
+### Universal First-Response Diagnostic Protocol:
 
 #### 1. Run System Integrity Scan
 Open **Command Prompt as Administrator** and execute:
@@ -98,10 +98,10 @@ sfc /scannow
 \`\`\`
 
 #### 2. Check Event Viewer for Critical Faults
-Press **Win + X** ➔ select **Event Viewer** ➔ Windows Logs ➔ **System** to track down error IDs.
+Press **Win + X** -> select **Event Viewer** -> Windows Logs -> **System** to track down error IDs.
 
 ---
-> 💬 **Next Step**: Share your laptop brand/model or specific error codes and DARBS will tailor the repair steps!`;
+> [NEXT STEP]: Share your laptop brand/model or specific error codes and DARBS will tailor the repair steps!`;
 }
 
 // Main Chat Endpoint returning standard JSON (compatible with your frontend)
@@ -121,13 +121,14 @@ app.post("/api/chat", async (req, res) => {
     // Technical Troubleshooting System Instructions
     let systemInstruction = `You are DARBS (Diagnostic Assistant for Repair, Bugs and Support), an expert AI Technical Support Engineer and Laptop/PC Repair Specialist.
 Your mission is to provide precise, structured, step-by-step diagnostic workflows, troubleshooting trees, command-line fixes, hardware guidance, and bug resolution for laptops, desktop computers, Windows/Linux/macOS systems, drivers, network issues, and peripherals.
+Do not use emojis in your responses. Use clean markdown formatting, numbered lists, exact command code blocks, and structured technical tags like [DIAGNOSE], [TEST], [FIX], [VERIFY], [SAFETY WARNING].
 
 CORE DIAGNOSTIC METHODOLOGY:
-1. 🔍 DIAGNOSE: Ask targeted clarifying questions or explain the root cause.
-2. 🧪 TEST: Guide the user to safely check Event Viewer, Task Manager, or Device Manager.
-3. 🛠️ FIX: Provide clear, numbered steps and exact commands in code blocks.
-4. ✅ VERIFY: Explain how to confirm the issue is resolved.
-5. ⚠️ HARDWARE SAFETY: Warn clearly about physical risks (e.g., swollen lithium-ion battery, unplug power before opening laptop chassis).`;
+1. [DIAGNOSE]: Ask targeted clarifying questions or explain the root cause.
+2. [TEST]: Guide the user to safely check Event Viewer, Task Manager, or Device Manager.
+3. [FIX]: Provide clear, numbered steps and exact commands in code blocks.
+4. [VERIFY]: Explain how to confirm the issue is resolved.
+5. [HARDWARE SAFETY]: Warn clearly about physical risks (e.g., swollen lithium-ion battery, unplug power before opening laptop chassis).`;
 
     if (persona === "windows_bsod") {
       systemInstruction += " Focus deeply on Windows Blue Screen of Death stop codes, minidump analysis, and corrupt system files.";
@@ -271,7 +272,7 @@ CORE DIAGNOSTIC METHODOLOGY:
           selectedPersona
         );
         return res.json({
-          reply: `> ⚡ *DARBS Offline Diagnostic Mode Active (API Quota Exceeded)*\n\n${fallback}`,
+          reply: `> [DARBS Offline Diagnostic Mode Active - API Quota Exceeded]\n\n${fallback}`,
           sources: [],
         });
       }

@@ -10,6 +10,13 @@ import { BrandLogo } from "./components/BrandLogo";
 import { AppSettings, ChatMessage, ChatSession, UserProfile } from "./types";
 import { speechController } from "./utils/speech";
 import { RotateCcw, LogOut } from "lucide-react";
+import { onAuthStateChange, logOutUser } from "./services/auth";
+import {
+  fetchUserSessionsFromFirestore,
+  saveSessionToFirestore,
+  deleteSessionFromFirestore,
+  clearAllSessionsFromFirestore,
+} from "./services/history";
 
 const INITIAL_SETTINGS: AppSettings = {
   persona: "hardware_laptop",
@@ -33,17 +40,17 @@ const createNewSession = (title?: string): ChatSession => {
       {
         id: `msg-${Date.now()}`,
         role: "assistant",
-        content: `Hello! I'm **DARBS** (*Diagnostic Assistant for Repair, Bugs & Support*), your reliable AI Laptop Troubleshooting and Repair Assistant. 💻
+        content: `Hello! I'm **DARBS** (*Diagnostic Assistant for Repair, Bugs & Support*), your Laptop & PC Technical Support Specialist.
 
-I can help diagnose, troubleshoot, maintain, and repair problems with your PC or laptop — including slowness, crashes, Windows errors, Wi-Fi issues, driver problems, and hardware diagnostics.
+I can help diagnose, troubleshoot, maintain, and repair problems with your PC or laptop — including system crashes, Windows errors, Wi-Fi issues, driver corruption, and hardware diagnostics.
 
-**How can I assist your PC today?**
-- ⚡ **Performance & Storage**: Fix slow laptop, 100% CPU/RAM/Disk, and free up drive space
-- 🚨 **BSOD & Windows Errors**: Decode error codes, fix crashes, run safe SFC/DISM repairs
-- 🌐 **Network & Connectivity**: Solve Wi-Fi dropping, DNS issues, and adapter failures
-- 🛠️ **Hardware & Thermal Diagnostics**: Address overheating, battery health, fan noise, and peripherals
-- 📸 **Photo Inspection**: Upload photos of hardware components, burnt capacitors, damaged ports, or error screens
-- 🎙️ **Voice Messages**: Record audio describing strange noises, coil whine, or complex symptoms`,
+**Diagnostic Modules Available:**
+- **Performance & Storage**: Troubleshoot high CPU/RAM/Disk utilization, storage bottlenecks, and background services
+- **BSOD & Kernel Crashes**: Analyze stop codes, read minidump logs, and execute system integrity repairs (SFC/DISM)
+- **Network & Connectivity**: Diagnose WLAN adapter drops, reset network stacks, and resolve DNS routing issues
+- **Hardware & Thermals**: Inspect component temperatures, thermal throttling, fan behavior, and battery wear
+- **Photo Inspection**: Upload images of hardware components, motherboard traces, or screen error codes
+- **Voice Diagnostics**: Record audio describing strange physical noises, coil whine, or fan bearing rattle`,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       },
     ],
@@ -102,10 +109,30 @@ export default function App() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Sync sessions to localStorage
+  // Listen for Firebase Auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChange(async (user) => {
+      if (user) {
+        setCurrentUser(user);
+        localStorage.setItem("darbs_auth_user", JSON.stringify(user));
+        // Retrieve synced chat history from Firestore
+        const cloudSessions = await fetchUserSessionsFromFirestore(user.id);
+        if (cloudSessions && cloudSessions.length > 0) {
+          setSessions(cloudSessions);
+          setCurrentSessionId(cloudSessions[0].id);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Sync sessions to localStorage & Firestore
   useEffect(() => {
     localStorage.setItem("darbs_diagnostic_sessions", JSON.stringify(sessions));
-  }, [sessions]);
+    if (currentUser && currentSession) {
+      saveSessionToFirestore(currentUser.id, currentSession);
+    }
+  }, [sessions, currentUser, currentSessionId]);
 
   // Sync settings to localStorage
   useEffect(() => {
@@ -134,8 +161,13 @@ export default function App() {
   }, [currentSession?.messages, isLoading]);
 
   // Handler: User Logout
-  const handleLogout = () => {
+  const handleLogout = async () => {
     speechController.stop();
+    try {
+      await logOutUser();
+    } catch (e) {
+      console.warn("Logout error:", e);
+    }
     localStorage.removeItem("darbs_auth_user");
     sessionStorage.removeItem("darbs_auth_user");
     setCurrentUser(null);
@@ -149,6 +181,9 @@ export default function App() {
     setSessions((prev) => [newSession, ...prev]);
     setCurrentSessionId(newSession.id);
     setIsExitedView(false);
+    if (currentUser) {
+      saveSessionToFirestore(currentUser.id, newSession);
+    }
   };
 
   // Handler: Select Session
@@ -161,11 +196,17 @@ export default function App() {
   // Handler: Delete single session
   const handleDeleteSession = (sessionId: string) => {
     speechController.stop();
+    if (currentUser) {
+      deleteSessionFromFirestore(currentUser.id, sessionId);
+    }
     setSessions((prev) => {
       const remaining = prev.filter((s) => s.id !== sessionId);
       if (remaining.length === 0) {
         const fresh = createNewSession();
         setCurrentSessionId(fresh.id);
+        if (currentUser) {
+          saveSessionToFirestore(currentUser.id, fresh);
+        }
         return [fresh];
       }
       if (currentSessionId === sessionId) {
@@ -178,10 +219,16 @@ export default function App() {
   // Handler: Clear all sessions / Delete history
   const handleClearAllSessions = () => {
     speechController.stop();
+    if (currentUser) {
+      clearAllSessionsFromFirestore(currentUser.id);
+    }
     const freshSession = createNewSession("New Diagnostic Session");
     setSessions([freshSession]);
     setCurrentSessionId(freshSession.id);
     localStorage.removeItem("darbs_diagnostic_sessions");
+    if (currentUser) {
+      saveSessionToFirestore(currentUser.id, freshSession);
+    }
     setIsDeleteModalOpen(false);
   };
 
@@ -350,9 +397,20 @@ export default function App() {
     }
   };
 
-  // IF NOT LOGGED IN: Render the Secure Login & Sign In Portal before opening DARBS
   if (!currentUser) {
-    return <LoginPortal onLogin={(user) => setCurrentUser(user)} />;
+    return (
+      <LoginPortal
+        onLogin={async (user) => {
+          setCurrentUser(user);
+          localStorage.setItem("darbs_auth_user", JSON.stringify(user));
+          const cloudSessions = await fetchUserSessionsFromFirestore(user.id);
+          if (cloudSessions && cloudSessions.length > 0) {
+            setSessions(cloudSessions);
+            setCurrentSessionId(cloudSessions[0].id);
+          }
+        }}
+      />
+    );
   }
 
   return (

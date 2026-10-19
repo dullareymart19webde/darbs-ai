@@ -8,7 +8,7 @@ import {
   Volume2,
   VolumeX,
   ExternalLink,
-  Sparkles,
+  Globe,
   AlertTriangle,
   Terminal,
   Play,
@@ -413,8 +413,8 @@ export const ChatMessageItem: React.FC<ChatMessageProps> = ({
           {message.sources && message.sources.length > 0 && (
             <div className="mt-3 rounded-xl border border-slate-800 bg-slate-900/60 p-3">
               <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-cyan-400">
-                <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
-                <span>Technical Documentation & Grounding Sources ({message.sources.length})</span>
+                <Globe className="h-3.5 w-3.5 text-cyan-400" />
+                <span>Technical Documentation & Reference Sources ({message.sources.length})</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {message.sources.map((src, i) => (

@@ -1,0 +1,19 @@
+{
+  "auth": {
+    "providers": {
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "DARBS AI",
+        "supportEmail": "dullareymart19@gmail.com",
+        "authorizedRedirectUris": [
+          "https://darbs-ai-app-2026.firebaseapp.com/__/auth/handler",
+          "http://localhost:3000",
+          "http://localhost:5173"
+        ]
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  }
+}
