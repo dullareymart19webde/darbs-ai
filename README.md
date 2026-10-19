@@ -3,6 +3,8 @@
 DARBS (Diagnostic Assistant for Repair, Bugs and Support) is a React/Vite
 troubleshooting assistant backed by an Express server and the Gemini API.
 
+The app was originally created in [Google AI Studio](https://ai.studio/apps/400fc1e0-bdbc-4625-a2db-bfe1ae3727ef).
+
 ## Requirements
 
 - Node.js 20 or newer
