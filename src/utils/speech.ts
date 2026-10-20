@@ -114,13 +114,9 @@ class SpeechController {
   private async fallbackServerTTS(text: string, messageId: string, voiceName: string) {
     try {
       this.notify(true, messageId);
-      const customKey = localStorage.getItem("darbs_custom_gemini_key") || "";
       const res = await fetch("/api/text-to-speech", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(customKey ? { "x-gemini-api-key": customKey } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: text.slice(0, 800), voiceName }),
       });
       const data = await res.json();

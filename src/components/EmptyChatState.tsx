@@ -161,3 +161,4 @@ export const EmptyChatState: React.FC<EmptyChatStateProps> = ({
     </div>
   );
 };
+

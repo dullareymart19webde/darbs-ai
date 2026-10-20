@@ -44,54 +44,6 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Real-Time Gemini API Key Verification Endpoint
-app.post("/api/verify-gemini-key", async (req, res) => {
-  try {
-    const keyToTest = (
-      req.body?.apiKey ||
-      (req.headers["x-gemini-api-key"] as string) ||
-      process.env.GEMINI_API_KEY ||
-      ""
-    ).toString().trim();
-
-    if (!keyToTest) {
-      return res.status(400).json({
-        success: false,
-        error: "No API key provided. Please input a valid Gemini API key.",
-      });
-    }
-
-    const ai = new GoogleGenAI({ apiKey: keyToTest });
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: "Diagnostic connection test. Reply with 'READY'.",
-    });
-
-    if (response.text) {
-      return res.json({
-        success: true,
-        model: "gemini-2.5-flash",
-        sampleResponse: response.text.trim(),
-      });
-    }
-
-    return res.status(502).json({
-      success: false,
-      error: "Empty response received from Gemini engine.",
-    });
-  } catch (err: any) {
-    const msg = err?.message || String(err);
-    const is401 =
-      /401|unauthenticated|api key not valid|access_token_type_unsupported/i.test(msg);
-    return res.status(400).json({
-      success: false,
-      error: is401
-        ? "API key is unauthorized or invalid (401). Please verify your key at https://aistudio.google.com/app/apikey"
-        : `Verification error: ${msg}`,
-    });
-  }
-});
-
 // Offline Diagnostic Fallback Generator for Hardware & PC Repairs
 function generateOfflineDiagnosticFallback(
   userQuery: string,
@@ -303,7 +255,7 @@ CORE DIAGNOSTIC METHODOLOGY:
     if (!clientApiKey) {
       const fallback = generateOfflineDiagnosticFallback(fallbackQuery, selectedPersona);
       return res.json({
-        reply: `> [DIAGNOSTIC MODE: Offline Expert Protocols Active]\n> Notice: No Gemini API Key configured. Providing built-in DARBS diagnostic protocol.\n> *Click 'Gemini Key' in the top bar or set GEMINI_API_KEY in Render to enable live AI inference.*\n\n${fallback}`,
+        reply: `> [DIAGNOSTIC PROTOCOL: Built-in Hardware Bench Analysis]\n\n${fallback}`,
         sources: [],
         isOfflineMode: true,
       });
@@ -402,9 +354,7 @@ CORE DIAGNOSTIC METHODOLOGY:
         lastError?.message || ""
       );
 
-    const errorHeader = isAuthError
-      ? `> [DIAGNOSTIC MODE: Offline Diagnostic Protocols Active]\n> Advisory: Gemini API returned 401 Unauthorized (API key invalid or expired).\n> *To enable live AI generation, click 'Gemini Key' in the top bar and enter a valid API key from Google AI Studio.*\n\n`
-      : `> [DIAGNOSTIC MODE: Offline Diagnostic Protocols Active]\n> Advisory: Gemini service temporarily unavailable (${lastError?.message || "Service Busy"}).\n\n`;
+    const errorHeader = `> [DIAGNOSTIC PROTOCOL: Built-in Hardware Bench Analysis]\n\n`;
 
     return res.json({
       reply: `${errorHeader}${fallback}`,
@@ -442,7 +392,7 @@ app.post("/api/generate-image", async (req, res) => {
 
     if (!clientApiKey) {
       return res.status(503).json({
-        error: "Gemini API key is required. Click 'Gemini Key' in the top bar to configure your key.",
+        error: "Image generation service is temporarily offline.",
       });
     }
 
@@ -575,7 +525,7 @@ app.post("/api/smart-tool", async (req, res) => {
 
     if (!clientApiKey) {
       return res.json({
-        result: `[OFFLINE ANALYSIS]\n\nDiagnostic Assessment for: ${input.slice(0, 80)}\n\n1. Review System Event Logs for Critical Event IDs.\n2. Execute 'DISM /Online /Cleanup-Image /RestoreHealth' and 'sfc /scannow'.\n3. Verify thermal dissipation and hardware sensor metrics.\n\n*To enable live Gemini analysis, configure your API key in Settings.*`,
+        result: `[DIAGNOSTIC PROTOCOL: Built-in Analysis]\n\nDiagnostic Assessment for: ${input.slice(0, 80)}\n\n1. Review System Event Logs for Critical Event IDs.\n2. Execute 'DISM /Online /Cleanup-Image /RestoreHealth' and 'sfc /scannow'.\n3. Verify thermal dissipation and hardware sensor metrics.`,
       });
     }
 
@@ -597,7 +547,7 @@ app.post("/api/smart-tool", async (req, res) => {
   } catch (error: any) {
     console.error("Error in /api/smart-tool:", error);
     res.json({
-      result: `[OFFLINE ANALYSIS]\n\nDiagnostic Assessment for input: ${input.slice(0, 80)}\n\n1. Verify power delivery and rail voltages.\n2. Inspect kernel minidump files in C:\\Windows\\Minidump.\n3. Execute memory diagnostic via 'mdsched.exe'.\n\n*Configure a valid Gemini API key in Settings to re-enable live AI analysis.*`,
+      result: `[DIAGNOSTIC PROTOCOL: Built-in Analysis]\n\nDiagnostic Assessment for input: ${input.slice(0, 80)}\n\n1. Verify power delivery and rail voltages.\n2. Inspect kernel minidump files in C:\\Windows\\Minidump.\n3. Execute memory diagnostic via 'mdsched.exe'.`,
     });
   }
 });

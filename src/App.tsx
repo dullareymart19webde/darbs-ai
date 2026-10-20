@@ -6,7 +6,6 @@ import { ChatInput } from "./components/ChatInput";
 import { DeleteHistoryModal } from "./components/DeleteHistoryModal";
 import { ExitModal } from "./components/ExitModal";
 import { LoginPortal } from "./components/LoginPortal";
-import { GeminiKeyModal } from "./components/GeminiKeyModal";
 import { ImageStudio } from "./components/ImageStudio";
 import { SmartToolsPanel } from "./components/SmartToolsPanel";
 import { EmptyChatState } from "./components/EmptyChatState";
@@ -94,7 +93,6 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DashboardTab>("chat");
-  const [isGeminiModalOpen, setIsGeminiModalOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -308,13 +306,9 @@ export default function App() {
         audioUrl: m.audioUrl,
       }));
 
-      const customKey = localStorage.getItem("darbs_custom_gemini_key") || "";
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(customKey ? { "x-gemini-api-key": customKey } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: historyPayload,
           persona: settings.persona,
@@ -434,7 +428,6 @@ export default function App() {
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           onOpenDeleteModal={() => setIsDeleteModalOpen(true)}
           onOpenExitModal={() => setIsExitModalOpen(true)}
-          onOpenGeminiModal={() => setIsGeminiModalOpen(true)}
           settings={settings}
           onToggleSpeech={handleToggleGlobalSpeech}
           currentUser={currentUser}
@@ -511,7 +504,6 @@ export default function App() {
                     settings={settings}
                     isSpeaking={speakingMessageId === msg.id}
                     onToggleMessageSpeech={handleToggleMessageSpeech}
-                    onOpenGeminiModal={() => setIsGeminiModalOpen(true)}
                   />
                 ))
               )}
@@ -577,15 +569,6 @@ export default function App() {
           handleClearAllSessions();
           setIsExitModalOpen(false);
           setIsExitedView(false);
-        }}
-      />
-
-      {/* Gemini Engine Configuration Modal */}
-      <GeminiKeyModal
-        isOpen={isGeminiModalOpen}
-        onClose={() => setIsGeminiModalOpen(false)}
-        onKeySaved={() => {
-          // Key updated in localStorage
         }}
       />
     </div>

@@ -9,7 +9,6 @@ import {
   Terminal,
   Camera,
   Cpu,
-  KeyRound,
   ChevronDown,
   Sparkles,
   User,
@@ -24,7 +23,6 @@ interface NavbarProps {
   onToggleSidebar: () => void;
   onOpenDeleteModal: () => void;
   onOpenExitModal: () => void;
-  onOpenGeminiModal: () => void;
   settings: AppSettings;
   onToggleSpeech: () => void;
   currentUser: UserProfile | null;
@@ -38,7 +36,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleSidebar,
   onOpenDeleteModal,
   onOpenExitModal,
-  onOpenGeminiModal,
   settings,
   onToggleSpeech,
   currentUser,
@@ -62,11 +59,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const hasCustomKey = Boolean(
-    typeof window !== "undefined" &&
-      localStorage.getItem("darbs_custom_gemini_key")
-  );
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-800 bg-[#070e1b]/95 px-3 md:px-5 backdrop-blur-md text-slate-100">
@@ -166,23 +158,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         )}
 
-        {/* Gemini Engine Configuration Pill */}
-        <button
-          id="btn-navbar-gemini-config"
-          onClick={onOpenGeminiModal}
-          className="flex items-center gap-1.5 rounded-xl border border-slate-700/80 bg-slate-900/90 py-1.5 px-2.5 text-xs font-medium text-slate-300 hover:border-cyan-500/50 hover:text-cyan-300 hover:bg-slate-800 transition-colors shadow-xs"
-          title="Gemini AI Configuration & Key Settings"
-        >
-          <KeyRound className="h-3.5 w-3.5 text-cyan-400" />
-          <span className="hidden lg:inline text-[11px] font-semibold">Gemini AI</span>
-          <span
-            className={`h-2 w-2 rounded-full ${
-              hasCustomKey ? "bg-emerald-400" : "bg-cyan-400"
-            }`}
-            title={hasCustomKey ? "Custom API Key Active" : "Server API Active"}
-          />
-        </button>
-
         {/* Technician Profile & Quick Settings Dropdown */}
         <div className="relative" ref={profileMenuRef}>
           <button
@@ -269,22 +244,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   >
                     {settings.speechEnabled ? "ON" : "OFF"}
                   </span>
-                </button>
-
-                {/* Gemini Engine Settings */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsProfileMenuOpen(false);
-                    onOpenGeminiModal();
-                  }}
-                  className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-slate-300 hover:bg-slate-900 hover:text-white transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <KeyRound className="h-4 w-4 text-cyan-400" />
-                    <span>Gemini API Key</span>
-                  </div>
-                  <span className="text-[10px] text-slate-400">Settings</span>
                 </button>
 
                 {/* Clear Chat History */}

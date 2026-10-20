@@ -93,13 +93,9 @@ export const ImageStudio: React.FC<ImageStudioProps> = ({
     const fullPrompt = styleObj ? `${styleObj.prefix}${prompt.trim()}` : prompt.trim();
 
     try {
-      const customKey = localStorage.getItem("darbs_custom_gemini_key") || "";
       const response = await fetch("/api/generate-image", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(customKey ? { "x-gemini-api-key": customKey } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: fullPrompt, aspectRatio }),
       });
 
