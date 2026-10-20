@@ -78,9 +78,13 @@ export const SmartToolsPanel: React.FC<SmartToolsPanelProps> = ({
     setError(null);
 
     try {
+      const customKey = localStorage.getItem("darbs_custom_gemini_key") || "";
       const response = await fetch("/api/smart-tool", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(customKey ? { "x-gemini-api-key": customKey } : {}),
+        },
         body: JSON.stringify({ toolType: activeTool, input }),
       });
 

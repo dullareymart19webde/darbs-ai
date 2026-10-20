@@ -8,11 +8,10 @@ dotenv.config({ path: [".env.local", ".env"] });
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
-const GEMINI_TEXT_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
-const GEMINI_TTS_MODEL =
-  process.env.GEMINI_TTS_MODEL || "gemini-3.8-flash-tts";
-const GEMINI_IMAGE_MODEL =
-  process.env.GEMINI_IMAGE_MODEL || "gemini-nano-banana-2.1";
+const GEMINI_TEXT_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.0-flash";
+const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "imagen-3.0-generate-002";
+
 const IMAGE_ASPECT_RATIOS = ["1:1", "16:9", "4:3", "9:16"] as const;
 const isImageAspectRatio = (
   value: unknown
@@ -21,14 +20,18 @@ const isImageAspectRatio = (
 
 app.use(express.json({ limit: "20mb" }));
 
-const getGeminiClient = (): GoogleGenAI => {
-  const apiKey = process.env.GEMINI_API_KEY;
+// Helper to retrieve a GoogleGenAI client with custom key support
+const getGeminiClient = (customKey?: string): GoogleGenAI => {
+  const apiKey = (
+    customKey ||
+    process.env.GEMINI_API_KEY ||
+    ""
+  ).toString().trim();
+
   if (!apiKey) {
-    throw new Error("GEMINI_API_KEY environment variable is missing.");
+    throw new Error("GEMINI_API_KEY is not configured.");
   }
-  return new GoogleGenAI({
-    apiKey,
-  });
+  return new GoogleGenAI({ apiKey });
 };
 
 // Health Check Endpoint
@@ -37,7 +40,56 @@ app.get("/api/health", (req, res) => {
     status: "ok",
     name: "DARBS Diagnostic Assistant API",
     geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
+    defaultModel: GEMINI_TEXT_MODEL,
   });
+});
+
+// Real-Time Gemini API Key Verification Endpoint
+app.post("/api/verify-gemini-key", async (req, res) => {
+  try {
+    const keyToTest = (
+      req.body?.apiKey ||
+      (req.headers["x-gemini-api-key"] as string) ||
+      process.env.GEMINI_API_KEY ||
+      ""
+    ).toString().trim();
+
+    if (!keyToTest) {
+      return res.status(400).json({
+        success: false,
+        error: "No API key provided. Please input a valid Gemini API key.",
+      });
+    }
+
+    const ai = new GoogleGenAI({ apiKey: keyToTest });
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: "Diagnostic connection test. Reply with 'READY'.",
+    });
+
+    if (response.text) {
+      return res.json({
+        success: true,
+        model: "gemini-2.5-flash",
+        sampleResponse: response.text.trim(),
+      });
+    }
+
+    return res.status(502).json({
+      success: false,
+      error: "Empty response received from Gemini engine.",
+    });
+  } catch (err: any) {
+    const msg = err?.message || String(err);
+    const is401 =
+      /401|unauthenticated|api key not valid|access_token_type_unsupported/i.test(msg);
+    return res.status(400).json({
+      success: false,
+      error: is401
+        ? "API key is unauthorized or invalid (401). Please verify your key at https://aistudio.google.com/app/apikey"
+        : `Verification error: ${msg}`,
+    });
+  }
 });
 
 // Offline Diagnostic Fallback Generator for Hardware & PC Repairs
@@ -47,6 +99,64 @@ function generateOfflineDiagnosticFallback(
 ): string {
   const q = userQuery.toLowerCase();
 
+  // 1. Performance, Lag, Slowness, High CPU/Disk
+  if (
+    q.includes("lag") ||
+    q.includes("slow") ||
+    q.includes("sluggish") ||
+    q.includes("freeze") ||
+    q.includes("stutter") ||
+    q.includes("100% disk") ||
+    q.includes("100% cpu") ||
+    persona === "performance_storage"
+  ) {
+    return `### [DIAGNOSTIC REPORT] PC Performance & Lag Troubleshooting Protocol
+
+I analyzed your report regarding system lag and slowness. Slowness is primarily caused by 100% disk utilization, thermal throttling, corrupt Windows component stores, or unoptimized startup services.
+
+---
+
+### Step-by-Step Diagnostic & Repair Protocol:
+
+#### 1. [DIAGNOSE]: Check Resource Saturation
+1. Press **Ctrl + Shift + Esc** to open **Task Manager**.
+2. Select the **Processes** tab and click on the **CPU**, **Memory**, and **Disk** columns to check which process is utilizing over 80-100%.
+3. Check the **Performance** tab -> **CPU**: Check if the clock speed is locked below **0.79 GHz** (which indicates severe thermal throttling or power adapter failure).
+
+#### 2. [FIX]: Run Windows Component Integrity Repairs
+Open **Command Prompt as Administrator** (**Win + S**, type \`cmd\`, right-click -> *Run as Administrator*):
+\`\`\`cmd
+DISM /Online /Cleanup-Image /RestoreHealth
+sfc /scannow
+\`\`\`
+*Wait for both scans to complete to 100%. If corrupted files are found, Windows will automatically replace them.*
+
+#### 3. [FIX]: Clean Drive & Clear Temporary Files
+Execute the following to purge accumulated temporary cache files that cause indexing lag:
+\`\`\`cmd
+cleanmgr /sagerun:1
+\`\`\`
+Or press **Win + R**, type \`temp\`, and delete unnecessary files. Repeat with \`%temp%\`.
+
+#### 4. [TEST]: Inspect Storage Drive Health (SMART Status)
+Check if a failing SSD or HDD is generating I/O wait latency:
+\`\`\`cmd
+wmic diskdrive get model,status
+\`\`\`
+*If status reports anything other than "OK", immediately back up your critical files.*
+
+#### 5. [VERIFY]: Trim & Optimize Drives
+In Windows PowerShell (Administrator):
+\`\`\`powershell
+Optimize-Volume -DriveLetter C -Defrag -Verbose
+\`\`\`
+*(For SSDs, this sends the TRIM command; for HDDs, it reorganizes fragmented sectors).*
+
+---
+> [NEXT STEP]: Reply with your CPU model, RAM amount, and whether your OS is installed on an SSD or HDD so DARBS can pinpoint specific tuning steps!`;
+  }
+
+  // 2. BSOD & System Crashes
   if (
     q.includes("bsod") ||
     q.includes("blue screen") ||
@@ -55,56 +165,96 @@ function generateOfflineDiagnosticFallback(
     q.includes("minidump") ||
     persona === "windows_bsod"
   ) {
-    return `### [DIAGNOSTIC GUIDE] DARBS Blue Screen (BSOD) Diagnostic & Recovery Guide
+    return `### [DIAGNOSTIC GUIDE] Blue Screen (BSOD) Diagnostic & Recovery Guide
 
-I analyzed your crash symptoms. Blue Screen errors typically stem from corrupt kernel files, faulty drivers (especially GPU/Wi-Fi), or bad RAM modules.
+I analyzed your crash symptoms. Blue Screen errors typically stem from corrupt kernel files, faulty drivers (especially GPU/Wi-Fi), or defective RAM modules.
 
 ---
 
 ### Step-by-Step Fix Protocol:
 
-#### 1. System File & Image Verification
+#### 1. [FIX]: System File & Image Verification
 Open **Command Prompt as Administrator** (**Win + S**, type \`cmd\`, right-click -> *Run as Administrator*):
 \`\`\`cmd
 DISM /Online /Cleanup-Image /RestoreHealth
 sfc /scannow
 \`\`\`
 
-#### 2. Test RAM for Bit Flips & Memory Leaks
+#### 2. [TEST]: Test RAM for Memory Bit Flips
 1. Press **Win + R**, type: \`mdsched.exe\`
 2. Select **"Restart now and check for problems"**.
+3. Let the diagnostic run its full pass after restart.
 
-#### 3. Analyze Minidump Logs
+#### 3. [DIAGNOSE]: Analyze Minidump Logs
 Locate crash dumps in: \`C:\\Windows\\Minidump\\\`
-Use **BlueScreenView** or **WinDbg** to pinpoint the exact \`.sys\` driver causing the crash.
+Use **BlueScreenView** or **WinDbg** to inspect the bugcheck code and pinpoint the exact \`.sys\` driver module causing the crash.
 
 ---
-> [ADVISORY]: If the BSOD started after a recent update, boot into Safe Mode (**Shift + Restart**) and roll back the driver in Device Manager.`;
+> [ADVISORY]: If the BSOD started after a recent update, boot into Safe Mode (**Shift + Restart** -> Troubleshoot -> Advanced -> Startup Settings) and roll back the affected driver in Device Manager.`;
   }
 
+  // 3. Network & Wi-Fi issues
+  if (
+    q.includes("wifi") ||
+    q.includes("wi-fi") ||
+    q.includes("network") ||
+    q.includes("internet") ||
+    q.includes("dns") ||
+    persona === "network_wifi"
+  ) {
+    return `### [DIAGNOSTIC REPORT] Network & Wi-Fi Troubleshooting Protocol
+
+I analyzed your network connectivity issue. Drops and DNS failures are commonly caused by corrupt socket stacks, driver power management sleep states, or stale DNS caches.
+
+---
+
+### Network Reset Protocol:
+
+#### 1. [FIX]: Reset TCP/IP Stack & Flush DNS
+Open **Command Prompt as Administrator** and execute sequentially:
+\`\`\`cmd
+netsh winsock reset
+netsh int ip reset
+ipconfig /release
+ipconfig /renew
+ipconfig /flushdns
+\`\`\`
+
+#### 2. [FIX]: Disable Wi-Fi Adapter Sleep Mode
+1. Press **Win + X** -> **Device Manager**.
+2. Expand **Network adapters**, right-click your Wi-Fi card -> **Properties**.
+3. In the **Power Management** tab, uncheck **"Allow the computer to turn off this device to save power"**.
+
+---
+> [VERIFY]: Restart your PC and router to test if ping latency and connection stability are restored.`;
+  }
+
+  // Universal Default Fallback
   return `### [DIAGNOSTIC REPORT] DARBS Diagnostic Analysis & System Troubleshooting
 
-I have analyzed your query regarding **"${userQuery.slice(0, 60)}"**. Here is the recommended diagnostic workflow:
+I have analyzed your request regarding **"${userQuery.slice(0, 80)}"**. Here is the recommended diagnostic workflow:
 
 ---
 
 ### Universal First-Response Diagnostic Protocol:
 
-#### 1. Run System Integrity Scan
-Open **Command Prompt as Administrator** and execute:
+#### 1. [DIAGNOSE]: System Integrity Verification
+Open **Command Prompt as Administrator** (**Win + S**, type \`cmd\`, right-click -> *Run as Administrator*):
 \`\`\`cmd
 DISM /Online /Cleanup-Image /RestoreHealth
 sfc /scannow
 \`\`\`
 
-#### 2. Check Event Viewer for Critical Faults
-Press **Win + X** -> select **Event Viewer** -> Windows Logs -> **System** to track down error IDs.
+#### 2. [TEST]: Event Viewer Diagnostics
+1. Press **Win + X** -> select **Event Viewer**.
+2. Navigate to **Windows Logs** -> **System**.
+3. Filter by **Critical** and **Error** to locate the exact Event ID and faulting application.
 
 ---
-> [NEXT STEP]: Share your laptop brand/model or specific error codes and DARBS will tailor the repair steps!`;
+> [NEXT STEP]: Please share your laptop/PC make, model, and any specific error codes displayed so DARBS can guide your next repair steps!`;
 }
 
-// Main Chat Endpoint returning standard JSON (compatible with your frontend)
+// Main Chat Endpoint returning standard JSON
 app.post("/api/chat", async (req, res) => {
   try {
     const { messages, persona, temperature, enableWebSearch } = req.body ?? {};
@@ -112,13 +262,14 @@ app.post("/api/chat", async (req, res) => {
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: "Messages array is required." });
     }
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(503).json({
-        error: "Gemini is not configured. Add GEMINI_API_KEY to .env.local and restart the server.",
-      });
-    }
 
-    // Technical Troubleshooting System Instructions
+    const clientApiKey = (
+      (req.headers["x-gemini-api-key"] as string) ||
+      process.env.GEMINI_API_KEY ||
+      ""
+    ).toString().trim();
+
+    // Prepare system instructions tailored to persona
     let systemInstruction = `You are DARBS (Diagnostic Assistant for Repair, Bugs and Support), an expert AI Technical Support Engineer and Laptop/PC Repair Specialist.
 Your mission is to provide precise, structured, step-by-step diagnostic workflows, troubleshooting trees, command-line fixes, hardware guidance, and bug resolution for laptops, desktop computers, Windows/Linux/macOS systems, drivers, network issues, and peripherals.
 Do not use emojis in your responses. Use clean markdown formatting, numbered lists, exact command code blocks, and structured technical tags like [DIAGNOSE], [TEST], [FIX], [VERIFY], [SAFETY WARNING].
@@ -138,153 +289,133 @@ CORE DIAGNOSTIC METHODOLOGY:
       systemInstruction += " Focus on Wi-Fi dropouts, driver power management, DNS flushes, and TCP/IP stack resets.";
     } else if (persona === "driver_software") {
       systemInstruction += " Focus on clean GPU driver installation, audio driver glitches, and peripheral USB errors.";
-    } else {
-      systemInstruction += " Focus on full-spectrum laptop hardware, thermals, fans, and battery health reports.";
     }
 
-    type InputMessage = {
-      role: "user" | "assistant";
-      content?: unknown;
-      imageUrl?: unknown;
-      audioData?: unknown;
-    };
-
-    const inputMessages = (messages as unknown[]).filter(
-      (message): message is InputMessage =>
-        !!message &&
-        typeof message === "object" &&
-        "role" in message &&
-        ((message as { role?: unknown }).role === "user" ||
-          (message as { role?: unknown }).role === "assistant")
-    );
-
-    const contents = inputMessages
-      .map((message) => {
-        const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
-
-        for (const dataUrl of [message.imageUrl, message.audioData]) {
-          if (typeof dataUrl !== "string") continue;
-          const matches = dataUrl.match(/^data:([\w.+-]+\/[\w.+-]+);base64,([\s\S]+)$/);
-          if (matches && matches.length === 3) {
-            parts.push({
-              inlineData: {
-                mimeType: matches[1],
-                data: matches[2],
-              },
-            });
-          }
-        }
-
-        if (typeof message.content === "string" && message.content.trim()) {
-          parts.push({ text: message.content });
-        } else if (parts.length > 0) {
-          parts.push({
-            text: message.audioData
-              ? "Please listen to this voice recording and diagnose the reported technical issue."
-              : "Please inspect and diagnose this hardware component or screen error photo in detail.",
-          });
-        }
-
-        return {
-          role: message.role === "user" ? "user" : "model",
-          parts,
-        };
-      })
-      .filter((message) => message.parts.length > 0);
-
-    while (contents[0]?.role === "model") {
-      contents.shift();
-    }
-    if (!contents.length || contents[contents.length - 1].role !== "user") {
-      return res.status(400).json({ error: "A user message is required." });
-    }
-
+    const inputMessages = messages.slice(-12);
     const lastUserMessage =
-      [...inputMessages].reverse().find((message) => message.role === "user")
-        ?.content;
+      [...inputMessages].reverse().find((m) => m.role === "user")?.content || "";
     const fallbackQuery =
       typeof lastUserMessage === "string" ? lastUserMessage : "";
     const selectedPersona =
       typeof persona === "string" ? persona : "hardware_laptop";
 
-    const ai = getGeminiClient();
-    const interactionInput: import("@google/genai").Interactions.Step[] =
-      contents.map((message) => ({
-        type: message.role === "user" ? "user_input" : "model_output",
-        content: message.parts.map((part) =>
-          part.text
-            ? { type: "text", text: part.text }
-            : {
-                type: part.inlineData?.mimeType.startsWith("audio/")
-                  ? "audio"
-                  : "image",
-                mime_type: part.inlineData?.mimeType || "image/png",
-                data: part.inlineData?.data || "",
-              }
-        ),
-      }));
-
-    try {
-      const response = await ai.interactions.create({
-        model: GEMINI_TEXT_MODEL,
-        input: interactionInput,
-        system_instruction: systemInstruction,
-        generation_config: {
-          temperature:
-            typeof temperature === "number"
-              ? Math.max(0, Math.min(2, temperature))
-              : 0.3,
-        },
-        ...(enableWebSearch ? { tools: [{ type: "google_search" as const }] } : {}),
-      });
-
-      if (response.output_text) {
-        const sources = response.steps.flatMap((step) =>
-          step.type === "model_output"
-            ? (step.content ?? []).flatMap((block) =>
-                block.type === "text"
-                  ? (block.annotations ?? []).flatMap((annotation) =>
-                      annotation.type === "url_citation" && annotation.url
-                        ? [{
-                            title: annotation.title || annotation.url,
-                            url: annotation.url,
-                          }]
-                        : []
-                    )
-                  : []
-              )
-            : []
-        );
-        return res.json({ reply: response.output_text, sources });
-      }
-
-      return res.status(502).json({
-        error: "Gemini returned an empty response.",
-      });
-    } catch (err: any) {
-      console.error(`Gemini request using ${GEMINI_TEXT_MODEL} failed:`, err);
-      const errorMessage = err?.message || String(err);
-      const isQuotaError = /quota|429|resource_exhausted/i.test(errorMessage);
-
-      if (isQuotaError) {
-        const fallback = generateOfflineDiagnosticFallback(
-          fallbackQuery,
-          selectedPersona
-        );
-        return res.json({
-          reply: `> [DARBS Offline Diagnostic Mode Active - API Quota Exceeded]\n\n${fallback}`,
-          sources: [],
-        });
-      }
-
-      return res.status(502).json({
-        error: `Gemini could not generate a response with ${GEMINI_TEXT_MODEL}: ${errorMessage}`,
+    // If no API key is provided at all, return instant offline diagnostic guidance
+    if (!clientApiKey) {
+      const fallback = generateOfflineDiagnosticFallback(fallbackQuery, selectedPersona);
+      return res.json({
+        reply: `> [DIAGNOSTIC MODE: Offline Expert Protocols Active]\n> Notice: No Gemini API Key configured. Providing built-in DARBS diagnostic protocol.\n> *Click 'Gemini Key' in the top bar or set GEMINI_API_KEY in Render to enable live AI inference.*\n\n${fallback}`,
+        sources: [],
+        isOfflineMode: true,
       });
     }
+
+    // Build standard multi-turn contents for @google/genai
+    const contents = inputMessages.map((msg) => {
+      const parts: any[] = [];
+      if (msg.content) {
+        parts.push({ text: msg.content });
+      }
+      if (msg.imageUrl && typeof msg.imageUrl === "string" && msg.imageUrl.startsWith("data:")) {
+        const [meta, base64Data] = msg.imageUrl.split(",");
+        const mimeType = meta.split(";")[0].replace("data:", "") || "image/png";
+        parts.push({
+          inlineData: {
+            mimeType,
+            data: base64Data,
+          },
+        });
+      }
+      if (msg.audioUrl && typeof msg.audioUrl === "string" && msg.audioUrl.startsWith("data:")) {
+        const [meta, base64Data] = msg.audioUrl.split(",");
+        const mimeType = meta.split(";")[0].replace("data:", "") || "audio/webm";
+        parts.push({
+          inlineData: {
+            mimeType,
+            data: base64Data,
+          },
+        });
+      }
+      return {
+        role: msg.role === "assistant" ? "model" : "user",
+        parts: parts.length > 0 ? parts : [{ text: " " }],
+      };
+    });
+
+    const ai = new GoogleGenAI({ apiKey: clientApiKey });
+    const modelsToTry = [GEMINI_TEXT_MODEL, "gemini-2.0-flash", "gemini-1.5-flash"];
+
+    let responseText = "";
+    let sources: any[] = [];
+    let callSucceeded = false;
+    let lastError: any = null;
+
+    for (const model of modelsToTry) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents,
+          config: {
+            systemInstruction,
+            temperature:
+              typeof temperature === "number"
+                ? Math.max(0, Math.min(2, temperature))
+                : 0.3,
+            ...(enableWebSearch ? { tools: [{ googleSearch: {} }] } : {}),
+          },
+        });
+
+        if (response.text) {
+          responseText = response.text;
+          callSucceeded = true;
+
+          const chunks =
+            response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+          if (Array.isArray(chunks)) {
+            sources = chunks
+              .filter((c: any) => c.web?.uri)
+              .map((c: any) => ({
+                title: c.web?.title || c.web?.uri,
+                url: c.web?.uri,
+              }));
+          }
+          break;
+        }
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`Gemini attempt with ${model} failed:`, err?.message);
+        const errMsg = err?.message || String(err);
+        if (/401|unauthenticated|api key not valid|access_token_type_unsupported/i.test(errMsg)) {
+          break; // Key itself is invalid, attempting other models will not resolve 401
+        }
+      }
+    }
+
+    if (callSucceeded && responseText) {
+      return res.json({ reply: responseText, sources });
+    }
+
+    // If call failed due to 401 unauthenticated or quota exhaustion, provide expert fallback
+    console.error("Gemini generation failed. Delivering offline diagnostic response:", lastError);
+    const fallback = generateOfflineDiagnosticFallback(fallbackQuery, selectedPersona);
+    const isAuthError =
+      /401|unauthenticated|api key not valid|access_token_type_unsupported/i.test(
+        lastError?.message || ""
+      );
+
+    const errorHeader = isAuthError
+      ? `> [DIAGNOSTIC MODE: Offline Diagnostic Protocols Active]\n> Advisory: Gemini API returned 401 Unauthorized (API key invalid or expired).\n> *To enable live AI generation, click 'Gemini Key' in the top bar and enter a valid API key from Google AI Studio.*\n\n`
+      : `> [DIAGNOSTIC MODE: Offline Diagnostic Protocols Active]\n> Advisory: Gemini service temporarily unavailable (${lastError?.message || "Service Busy"}).\n\n`;
+
+    return res.json({
+      reply: `${errorHeader}${fallback}`,
+      sources: [],
+      isOfflineMode: true,
+      authError: isAuthError,
+    });
   } catch (error: any) {
-    console.error("Error in /api/chat:", error);
+    console.error("Critical error in /api/chat:", error);
     res.status(500).json({
-      error: error.message || "Failed to process the Gemini chat request.",
+      error: error.message || "Failed to process the diagnostic chat request.",
     });
   }
 });
@@ -302,48 +433,49 @@ app.post("/api/generate-image", async (req, res) => {
     if (!isImageAspectRatio(aspectRatio)) {
       return res.status(400).json({ error: "Unsupported image aspect ratio." });
     }
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(503).json({ error: "Gemini is not configured." });
-    }
 
-    const ai = getGeminiClient();
-    
-    // Tier 1: Try interactions.create with configured model
-    try {
-      const response = await ai.interactions.create({
-        model: GEMINI_IMAGE_MODEL,
-        input: prompt.trim(),
-        response_format: {
-          type: "image",
-          mime_type: "image/png",
-          aspect_ratio: aspectRatio,
-        },
+    const clientApiKey = (
+      (req.headers["x-gemini-api-key"] as string) ||
+      process.env.GEMINI_API_KEY ||
+      ""
+    ).toString().trim();
+
+    if (!clientApiKey) {
+      return res.status(503).json({
+        error: "Gemini API key is required. Click 'Gemini Key' in the top bar to configure your key.",
       });
-
-      if (response.output_image?.data) {
-        return res.json({
-          imageUrl: `data:${response.output_image.mime_type || "image/png"};base64,${response.output_image.data}`,
-          caption: response.output_text || null,
-        });
-      }
-    } catch (err1: any) {
-      console.warn(`interactions.create failed with ${GEMINI_IMAGE_MODEL}:`, err1?.message);
     }
 
-    // Tier 2: Try ai.models.generateImages with imagen models
-    const fallbackModels = ["imagen-3.0-generate-002", "imagen-4.0-generate-001", "imagen-3.0-generate-001"];
+    const ai = new GoogleGenAI({ apiKey: clientApiKey });
+    const targetRatio =
+      aspectRatio === "16:9"
+        ? "16:9"
+        : aspectRatio === "4:3"
+        ? "4:3"
+        : aspectRatio === "9:16"
+        ? "9:16"
+        : "1:1";
+
+    // Tier 1: Try ai.models.generateImages with imagen models
+    const fallbackModels = [
+      GEMINI_IMAGE_MODEL,
+      "imagen-3.0-generate-002",
+      "imagen-4.0-generate-001",
+      "imagen-3.0-generate-001",
+    ];
+
     for (const modelName of fallbackModels) {
       try {
-        const response2 = await ai.models.generateImages({
+        const response = await ai.models.generateImages({
           model: modelName,
           prompt: prompt.trim(),
           config: {
             numberOfImages: 1,
-            aspectRatio: aspectRatio === "16:9" ? "16:9" : aspectRatio === "4:3" ? "4:3" : aspectRatio === "9:16" ? "9:16" : "1:1",
+            aspectRatio: targetRatio,
           },
         });
 
-        const b64 = response2.generatedImages?.[0]?.image?.imageBytes;
+        const b64 = response.generatedImages?.[0]?.image?.imageBytes;
         if (b64) {
           return res.json({
             imageUrl: `data:image/png;base64,${b64}`,
@@ -351,12 +483,12 @@ app.post("/api/generate-image", async (req, res) => {
           });
         }
       } catch (errFallback: any) {
-        console.warn(`Fallback image generation failed with ${modelName}:`, errFallback?.message);
+        console.warn(`Image generation attempt with ${modelName} failed:`, errFallback?.message);
       }
     }
 
     return res.status(502).json({
-      error: "Unable to generate image at this time. Please check your Gemini API key permissions or try a simpler prompt.",
+      error: "Unable to generate image at this time. Please verify that your Gemini API key has access to image generation models.",
     });
   } catch (error: any) {
     console.error("Error in /api/generate-image:", error);
@@ -371,30 +503,43 @@ app.post("/api/text-to-speech", async (req, res) => {
     if (typeof text !== "string" || !text.trim()) {
       return res.status(400).json({ error: "Text is required for TTS." });
     }
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(503).json({ error: "Gemini is not configured." });
+
+    const clientApiKey = (
+      (req.headers["x-gemini-api-key"] as string) ||
+      process.env.GEMINI_API_KEY ||
+      ""
+    ).toString().trim();
+
+    if (!clientApiKey) {
+      return res.status(503).json({ error: "Gemini API key is not configured." });
     }
 
-    const cleanText = text.slice(0, 1000);
-    const ai = getGeminiClient();
-    const response = await ai.interactions.create({
-      model: GEMINI_TTS_MODEL,
-      input: cleanText,
-      response_format: { type: "audio" },
-      generation_config: {
-        speech_config: [{ voice: voiceName }],
-      },
-    });
+    const cleanText = text.slice(0, 800);
+    const ai = new GoogleGenAI({ apiKey: clientApiKey });
 
-    const audioPart = response.output_audio?.data;
-    if (!audioPart) {
-      return res.status(500).json({ error: "Failed to generate audio output." });
+    // Use interactions.create if supported, otherwise return 503 so frontend uses Web Speech
+    try {
+      const response = await ai.interactions.create({
+        model: GEMINI_TTS_MODEL,
+        input: cleanText,
+        response_format: { type: "audio" },
+        generation_config: {
+          speech_config: [{ voice: voiceName }],
+        },
+      });
+
+      const audioPart = response.output_audio?.data;
+      if (audioPart) {
+        return res.json({
+          audioBase64: audioPart,
+          mimeType: response.output_audio?.mime_type || "audio/wav",
+        });
+      }
+    } catch (err: any) {
+      console.warn("Server TTS failed, client will use Web Speech API fallback:", err?.message);
     }
 
-    res.json({
-      audioBase64: audioPart,
-      mimeType: response.output_audio?.mime_type || "audio/wav",
-    });
+    return res.status(503).json({ error: "Server TTS not available. Fallback to browser speech." });
   } catch (error: any) {
     console.error("Error in /api/text-to-speech:", error);
     res.status(500).json({ error: error.message || "Failed to generate text-to-speech." });
@@ -408,36 +553,52 @@ app.post("/api/smart-tool", async (req, res) => {
     if (typeof input !== "string" || !input.trim()) {
       return res.status(400).json({ error: "Input text required." });
     }
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(503).json({ error: "Gemini is not configured." });
-    }
 
-    const ai = getGeminiClient();
+    const clientApiKey = (
+      (req.headers["x-gemini-api-key"] as string) ||
+      process.env.GEMINI_API_KEY ||
+      ""
+    ).toString().trim();
+
     let prompt = "";
     if (toolType === "enhance_prompt") {
-      prompt = `Enhance and optimize the following prompt for an AI model: "${input}"`;
+      prompt = `Enhance and optimize the following hardware diagnostic query for maximum technical accuracy: "${input}"`;
     } else if (toolType === "summarize") {
-      prompt = `Provide a concise executive summary and key action items for:\n\n${input}`;
+      prompt = `Provide a concise executive diagnostic summary and prioritized action items for:\n\n${input}`;
     } else if (toolType === "code_explain") {
-      prompt = `Analyze and explain this code in plain English:\n\n${input}`;
-    } else if (toolType === "flashcards") {
-      prompt = `Create a concise set of study flashcards from the following material. Format each card as a numbered question followed by its answer. Cover the most important facts and concepts:\n\n${input}`;
+      prompt = `Analyze this system error log or script and detail the root cause and step-by-step fix:\n\n${input}`;
+    } else if (toolType === "checklist") {
+      prompt = `Create a structured hardware bench repair checklist with multimeter probing and component testing points for:\n\n${input}`;
     } else {
-      prompt = `Analyze the following content:\n\n${input}`;
+      prompt = `Analyze the following diagnostic content:\n\n${input}`;
     }
 
-    const response = await ai.interactions.create({
+    if (!clientApiKey) {
+      return res.json({
+        result: `[OFFLINE ANALYSIS]\n\nDiagnostic Assessment for: ${input.slice(0, 80)}\n\n1. Review System Event Logs for Critical Event IDs.\n2. Execute 'DISM /Online /Cleanup-Image /RestoreHealth' and 'sfc /scannow'.\n3. Verify thermal dissipation and hardware sensor metrics.\n\n*To enable live Gemini analysis, configure your API key in Settings.*`,
+      });
+    }
+
+    const ai = new GoogleGenAI({ apiKey: clientApiKey });
+    const response = await ai.models.generateContent({
       model: GEMINI_TEXT_MODEL,
-      input: prompt,
+      contents: prompt,
+      config: {
+        systemInstruction: "You are a senior hardware diagnostics engineer. Do not use emojis in your response.",
+        temperature: 0.2,
+      },
     });
 
-    if (!response.output_text) {
-      return res.status(502).json({ error: "Gemini returned an empty result." });
+    if (response.text) {
+      return res.json({ result: response.text });
     }
-    res.json({ result: response.output_text });
+
+    return res.status(502).json({ error: "Gemini returned an empty result." });
   } catch (error: any) {
     console.error("Error in /api/smart-tool:", error);
-    res.status(500).json({ error: error.message || "Smart tool execution failed." });
+    res.json({
+      result: `[OFFLINE ANALYSIS]\n\nDiagnostic Assessment for input: ${input.slice(0, 80)}\n\n1. Verify power delivery and rail voltages.\n2. Inspect kernel minidump files in C:\\Windows\\Minidump.\n3. Execute memory diagnostic via 'mdsched.exe'.\n\n*Configure a valid Gemini API key in Settings to re-enable live AI analysis.*`,
+    });
   }
 });
 

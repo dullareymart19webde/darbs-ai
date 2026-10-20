@@ -17,6 +17,7 @@ import {
   Maximize2,
   X,
   FileImage,
+  KeyRound,
 } from "lucide-react";
 import { ChatMessage as ChatMessageType, AppSettings } from "../types";
 import { PERSONA_CONFIGS } from "../data/prompts";
@@ -27,6 +28,7 @@ interface ChatMessageProps {
   settings: AppSettings;
   isSpeaking: boolean;
   onToggleMessageSpeech: (text: string, messageId: string) => void;
+  onOpenGeminiModal?: () => void;
 }
 
 // Inline Voice Message Player Component
@@ -153,6 +155,7 @@ export const ChatMessageItem: React.FC<ChatMessageProps> = ({
   settings,
   isSpeaking,
   onToggleMessageSpeech,
+  onOpenGeminiModal,
 }) => {
   const [copied, setCopied] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -314,9 +317,25 @@ export const ChatMessageItem: React.FC<ChatMessageProps> = ({
 
           {/* Message Error Warning */}
           {message.isError && (
-            <div className="flex items-center gap-2 rounded-lg border border-red-900/60 bg-red-950/30 p-3 text-xs text-red-400">
-              <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
-              <span>{message.content}</span>
+            <div className="flex flex-col gap-2 rounded-xl border border-red-900/60 bg-red-950/30 p-3.5 text-xs text-red-300">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
+                <span className="font-medium">{message.content}</span>
+              </div>
+              {onOpenGeminiModal && (
+                <div className="pt-1 flex items-center gap-2">
+                  <button
+                    onClick={onOpenGeminiModal}
+                    className="flex items-center gap-1.5 rounded-lg border border-cyan-500/50 bg-cyan-950/60 px-3 py-1.5 text-xs font-semibold text-cyan-300 hover:bg-cyan-900/50 transition-colors shadow-sm"
+                  >
+                    <KeyRound className="h-3.5 w-3.5" />
+                    <span>Configure Gemini API Key</span>
+                  </button>
+                  <span className="text-[10px] text-slate-400">
+                    Enter valid API key from Google AI Studio
+                  </span>
+                </div>
+              )}
             </div>
           )}
 

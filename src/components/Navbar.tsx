@@ -9,6 +9,7 @@ import {
   Terminal,
   Camera,
   Cpu,
+  KeyRound,
 } from "lucide-react";
 import { AppSettings, DashboardTab, UserProfile } from "../types";
 import { BrandLogo } from "./BrandLogo";
@@ -18,6 +19,7 @@ interface NavbarProps {
   onToggleSidebar: () => void;
   onOpenDeleteModal: () => void;
   onOpenExitModal: () => void;
+  onOpenGeminiModal: () => void;
   settings: AppSettings;
   onToggleSpeech: () => void;
   currentUser: UserProfile | null;
@@ -31,6 +33,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleSidebar,
   onOpenDeleteModal,
   onOpenExitModal,
+  onOpenGeminiModal,
   settings,
   onToggleSpeech,
   currentUser,
@@ -168,6 +171,17 @@ export const Navbar: React.FC<NavbarProps> = ({
           ) : (
             <VolumeX className="h-4 w-4" />
           )}
+        </button>
+
+        {/* Gemini Engine Configuration Button */}
+        <button
+          id="btn-navbar-gemini-config"
+          onClick={onOpenGeminiModal}
+          className="relative flex items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-900/90 p-2 text-slate-300 hover:border-cyan-500/50 hover:text-cyan-300 hover:bg-slate-800 transition-colors"
+          title="Gemini AI Engine Settings (API Key & Models)"
+        >
+          <KeyRound className="h-4 w-4" />
+          <span className="hidden md:inline text-xs font-semibold">Gemini Key</span>
         </button>
 
         {/* User Profile Avatar with sign-out option */}

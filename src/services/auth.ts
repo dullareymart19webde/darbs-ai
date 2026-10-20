@@ -60,6 +60,9 @@ export const syncUserProfileToFirestore = async (
 export const signInWithEmail = async (email: string, password: string): Promise<UserProfile> => {
   const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
   const profile = mapFirebaseUserToProfile(credential.user);
+  try {
+    localStorage.setItem("darbs_auth_user", JSON.stringify(profile));
+  } catch (e) {}
   await syncUserProfileToFirestore(profile);
   return profile;
 };
@@ -78,6 +81,9 @@ export const signUpWithEmail = async (
     }
   }
   const profile = mapFirebaseUserToProfile(credential.user, name.trim());
+  try {
+    localStorage.setItem("darbs_auth_user", JSON.stringify(profile));
+  } catch (e) {}
   await syncUserProfileToFirestore(profile);
   return profile;
 };
@@ -85,11 +91,18 @@ export const signUpWithEmail = async (
 export const signInWithGoogle = async (): Promise<UserProfile> => {
   const credential = await signInWithPopup(auth, googleProvider);
   const profile = mapFirebaseUserToProfile(credential.user);
+  try {
+    localStorage.setItem("darbs_auth_user", JSON.stringify(profile));
+  } catch (e) {}
   await syncUserProfileToFirestore(profile);
   return profile;
 };
 
 export const logOutUser = async (): Promise<void> => {
+  try {
+    localStorage.removeItem("darbs_auth_user");
+    sessionStorage.removeItem("darbs_auth_user");
+  } catch (e) {}
   await signOut(auth);
 };
 
@@ -97,6 +110,9 @@ export const onAuthStateChange = (callback: (user: UserProfile | null) => void) 
   return onAuthStateChanged(auth, async (fbUser) => {
     if (fbUser) {
       const profile = mapFirebaseUserToProfile(fbUser);
+      try {
+        localStorage.setItem("darbs_auth_user", JSON.stringify(profile));
+      } catch (e) {}
       callback(profile);
     } else {
       callback(null);

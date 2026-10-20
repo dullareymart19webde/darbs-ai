@@ -53,7 +53,7 @@ export const LoginPortal: React.FC<LoginPortalProps> = ({ onLogin }) => {
       return "Only one sign-in window can be open at a time.";
     }
     if (code === "auth/unauthorized-domain") {
-      return "Domain not yet authorized in Firebase Console (Authentication > Settings > Authorized Domains).";
+      return "Authentication domain is not authorized. Please check your cloud configuration.";
     }
     return msg || "Authentication failed. Please check your network and try again.";
   };
@@ -64,10 +64,13 @@ export const LoginPortal: React.FC<LoginPortalProps> = ({ onLogin }) => {
     setIsSubmitting(true);
     try {
       const user = await signInWithGoogle();
+      try {
+        localStorage.setItem("darbs_auth_user", JSON.stringify(user));
+      } catch (e) {}
       setSuccessMessage(`Welcome, ${user.name}! Connecting to DARBS...`);
       setTimeout(() => {
         onLogin(user);
-      }, 500);
+      }, 300);
     } catch (err: any) {
       console.error("Google sign-in error:", err);
       setError(getFriendlyErrorMessage(err));
@@ -108,10 +111,13 @@ export const LoginPortal: React.FC<LoginPortalProps> = ({ onLogin }) => {
       setIsSubmitting(true);
       try {
         const user = await signUpWithEmail(name.trim(), cleanEmail, password);
-        setSuccessMessage("Firebase account registered successfully! Opening DARBS...");
+        try {
+          localStorage.setItem("darbs_auth_user", JSON.stringify(user));
+        } catch (e) {}
+        setSuccessMessage("Technician account created successfully! Opening DARBS...");
         setTimeout(() => {
           onLogin(user);
-        }, 500);
+        }, 300);
       } catch (err: any) {
         console.error("Email sign up error:", err);
         setError(getFriendlyErrorMessage(err));
@@ -121,10 +127,13 @@ export const LoginPortal: React.FC<LoginPortalProps> = ({ onLogin }) => {
       setIsSubmitting(true);
       try {
         const user = await signInWithEmail(cleanEmail, password);
-        setSuccessMessage("Credentials verified with Firebase. Opening DARBS...");
+        try {
+          localStorage.setItem("darbs_auth_user", JSON.stringify(user));
+        } catch (e) {}
+        setSuccessMessage("Technician credentials verified. Opening DARBS...");
         setTimeout(() => {
           onLogin(user);
-        }, 400);
+        }, 300);
       } catch (err: any) {
         console.error("Email sign in error:", err);
         setPasswordError(true);
@@ -381,11 +390,11 @@ export const LoginPortal: React.FC<LoginPortalProps> = ({ onLogin }) => {
               {isSubmitting ? (
                 <>
                   <div className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                  <span>Connecting to Firebase...</span>
+                  <span>Authenticating...</span>
                 </>
               ) : (
                 <>
-                  <span>{isSignUp ? "Register with Firebase" : "Log In with Firebase"}</span>
+                  <span>{isSignUp ? "Register Technician Account" : "Sign In to DARBS"}</span>
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}
