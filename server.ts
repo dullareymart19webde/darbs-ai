@@ -262,36 +262,57 @@ CORE DIAGNOSTIC METHODOLOGY:
     }
 
     // Build standard multi-turn contents for @google/genai
-    const contents = inputMessages.map((msg) => {
-      const parts: any[] = [];
-      if (msg.content) {
-        parts.push({ text: msg.content });
-      }
-      if (msg.imageUrl && typeof msg.imageUrl === "string" && msg.imageUrl.startsWith("data:")) {
-        const [meta, base64Data] = msg.imageUrl.split(",");
-        const mimeType = meta.split(";")[0].replace("data:", "") || "image/png";
-        parts.push({
-          inlineData: {
-            mimeType,
-            data: base64Data,
-          },
-        });
-      }
-      if (msg.audioUrl && typeof msg.audioUrl === "string" && msg.audioUrl.startsWith("data:")) {
-        const [meta, base64Data] = msg.audioUrl.split(",");
-        const mimeType = meta.split(";")[0].replace("data:", "") || "audio/webm";
-        parts.push({
-          inlineData: {
-            mimeType,
-            data: base64Data,
-          },
-        });
-      }
-      return {
-        role: msg.role === "assistant" ? "model" : "user",
-        parts: parts.length > 0 ? parts : [{ text: " " }],
-      };
-    });
+    const contents = await Promise.all(
+      inputMessages.map(async (msg) => {
+        const parts: any[] = [];
+        if (msg.content) {
+          parts.push({ text: msg.content });
+        }
+        if (msg.imageUrl && typeof msg.imageUrl === "string") {
+          if (msg.imageUrl.startsWith("data:")) {
+            const [meta, base64Data] = msg.imageUrl.split(",");
+            const mimeType = meta.split(";")[0].replace("data:", "") || "image/png";
+            parts.push({
+              inlineData: {
+                mimeType,
+                data: base64Data,
+              },
+            });
+          } else if (msg.imageUrl.startsWith("http")) {
+            try {
+              const imgRes = await fetch(msg.imageUrl, { signal: AbortSignal.timeout(8000) });
+              if (imgRes.ok) {
+                const mimeType = imgRes.headers.get("content-type") || "image/jpeg";
+                const arrayBuf = await imgRes.arrayBuffer();
+                const b64 = Buffer.from(arrayBuf).toString("base64");
+                parts.push({
+                  inlineData: {
+                    mimeType,
+                    data: b64,
+                  },
+                });
+              }
+            } catch (imgErr) {
+              console.warn("Could not fetch remote image for vision chat:", imgErr);
+            }
+          }
+        }
+        if (msg.audioUrl && typeof msg.audioUrl === "string" && msg.audioUrl.startsWith("data:")) {
+          const [meta, base64Data] = msg.audioUrl.split(",");
+          const mimeType = meta.split(";")[0].replace("data:", "") || "audio/webm";
+          parts.push({
+            inlineData: {
+              mimeType,
+              data: base64Data,
+            },
+          });
+        }
+        return {
+          role: msg.role === "assistant" ? "model" : "user",
+          parts: parts.length > 0 ? parts : [{ text: " " }],
+        };
+      })
+    );
 
     const ai = new GoogleGenAI({ apiKey: clientApiKey });
     const modelsToTry = [GEMINI_TEXT_MODEL, "gemini-2.0-flash", "gemini-1.5-flash"];
@@ -370,7 +391,7 @@ CORE DIAGNOSTIC METHODOLOGY:
   }
 });
 
-// Image Generation Endpoint
+// Image Generation Endpoint powered by Pollinations AI
 app.post("/api/generate-image", async (req, res) => {
   try {
     const { prompt, aspectRatio = "1:1" } = req.body ?? {};
@@ -384,65 +405,59 @@ app.post("/api/generate-image", async (req, res) => {
       return res.status(400).json({ error: "Unsupported image aspect ratio." });
     }
 
-    const clientApiKey = (
-      (req.headers["x-gemini-api-key"] as string) ||
-      process.env.GEMINI_API_KEY ||
-      ""
-    ).toString().trim();
-
-    if (!clientApiKey) {
-      return res.status(503).json({
-        error: "Image generation service is temporarily offline.",
-      });
+    let width = 1024;
+    let height = 1024;
+    if (aspectRatio === "16:9") {
+      width = 1280;
+      height = 720;
+    } else if (aspectRatio === "4:3") {
+      width = 1024;
+      height = 768;
+    } else if (aspectRatio === "9:16") {
+      width = 720;
+      height = 1280;
     }
 
-    const ai = new GoogleGenAI({ apiKey: clientApiKey });
-    const targetRatio =
-      aspectRatio === "16:9"
-        ? "16:9"
-        : aspectRatio === "4:3"
-        ? "4:3"
-        : aspectRatio === "9:16"
-        ? "9:16"
-        : "1:1";
+    const seed = Math.floor(Math.random() * 10000000);
+    const cleanPrompt = prompt.trim();
+    const encodedPrompt = encodeURIComponent(cleanPrompt);
+    const pollinationUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true`;
 
-    // Tier 1: Try ai.models.generateImages with imagen models
-    const fallbackModels = [
-      GEMINI_IMAGE_MODEL,
-      "imagen-3.0-generate-002",
-      "imagen-4.0-generate-001",
-      "imagen-3.0-generate-001",
-    ];
+    // Attempt server-side fetch with timeout to return base64 data URI
+    try {
+      const response = await fetch(pollinationUrl, {
+        signal: AbortSignal.timeout(15000),
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        },
+      });
 
-    for (const modelName of fallbackModels) {
-      try {
-        const response = await ai.models.generateImages({
-          model: modelName,
-          prompt: prompt.trim(),
-          config: {
-            numberOfImages: 1,
-            aspectRatio: targetRatio,
-          },
-        });
-
-        const b64 = response.generatedImages?.[0]?.image?.imageBytes;
-        if (b64) {
+      if (response.ok) {
+        const contentType = response.headers.get("content-type") || "image/jpeg";
+        if (contentType.startsWith("image/")) {
+          const arrayBuffer = await response.arrayBuffer();
+          const base64 = Buffer.from(arrayBuffer).toString("base64");
           return res.json({
-            imageUrl: `data:image/png;base64,${b64}`,
-            caption: null,
+            imageUrl: `data:${contentType};base64,${base64}`,
+            caption: cleanPrompt,
+            engine: "pollinations",
           });
         }
-      } catch (errFallback: any) {
-        console.warn(`Image generation attempt with ${modelName} failed:`, errFallback?.message);
       }
+    } catch (fetchErr: any) {
+      console.warn("Pollinations server-side fetch notice, using direct URL:", fetchErr?.message);
     }
 
-    return res.status(502).json({
-      error: "Unable to generate image at this time. Please verify that your Gemini API key has access to image generation models.",
+    // Direct URL fallback (client browser loads directly from Pollinations without server IP limit)
+    return res.json({
+      imageUrl: pollinationUrl,
+      caption: cleanPrompt,
+      engine: "pollinations_direct",
     });
   } catch (error: any) {
     console.error("Error in /api/generate-image:", error);
-    res.status(502).json({ error: error.message || "Failed to generate image." });
+    res.status(500).json({ error: error.message || "Failed to generate image." });
   }
 });
 

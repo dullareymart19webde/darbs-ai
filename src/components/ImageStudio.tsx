@@ -134,13 +134,30 @@ export const ImageStudio: React.FC<ImageStudioProps> = ({
     }
   };
 
-  const handleDownload = (imageUrl: string, filename: string) => {
-    const link = document.createElement("a");
-    link.href = imageUrl;
-    link.download = `${filename || "darbs-diagnostic-photo"}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownload = async (imageUrl: string, filename: string) => {
+    try {
+      if (imageUrl.startsWith("data:")) {
+        const link = document.createElement("a");
+        link.href = imageUrl;
+        link.download = `${filename || "darbs-diagnostic-photo"}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        const res = await fetch(imageUrl);
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = `${filename || "darbs-diagnostic-photo"}.jpg`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      }
+    } catch (e) {
+      window.open(imageUrl, "_blank");
+    }
   };
 
   return (
@@ -163,7 +180,7 @@ export const ImageStudio: React.FC<ImageStudioProps> = ({
 
         <div className="flex items-center gap-2 text-xs text-cyan-400 bg-cyan-950/40 border border-cyan-800/40 px-3 py-1.5 rounded-xl self-start sm:self-auto">
           <Cpu className="h-3.5 w-3.5" />
-          <span>Gemini Vision Generation Engine</span>
+          <span>Pollinations AI Visual Engine</span>
         </div>
       </div>
 
