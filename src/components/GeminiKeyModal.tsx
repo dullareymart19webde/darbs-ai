@@ -267,3 +267,4 @@ export const GeminiKeyModal: React.FC<GeminiKeyModalProps> = ({
     </div>
   );
 };
+

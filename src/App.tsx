@@ -9,6 +9,7 @@ import { LoginPortal } from "./components/LoginPortal";
 import { GeminiKeyModal } from "./components/GeminiKeyModal";
 import { ImageStudio } from "./components/ImageStudio";
 import { SmartToolsPanel } from "./components/SmartToolsPanel";
+import { EmptyChatState } from "./components/EmptyChatState";
 import { BrandLogo } from "./components/BrandLogo";
 import { AppSettings, ChatMessage, ChatSession, DashboardTab, PersonaType, UserProfile } from "./types";
 import { speechController } from "./utils/speech";
@@ -39,24 +40,7 @@ const createNewSession = (title?: string): ChatSession => {
     createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     updatedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     persona: "hardware_laptop",
-    messages: [
-      {
-        id: `msg-${Date.now()}`,
-        role: "assistant",
-        content: `Hello! I'm **DARBS** (*Diagnostic Assistant for Repair, Bugs & Support*), your Laptop & PC Technical Support Specialist.
-
-I can help diagnose, troubleshoot, maintain, and repair problems with your PC or laptop — including system crashes, Windows errors, Wi-Fi issues, driver corruption, and hardware diagnostics.
-
-**Diagnostic Modules Available:**
-- **Performance & Storage**: Troubleshoot high CPU/RAM/Disk utilization, storage bottlenecks, and background services
-- **BSOD & Kernel Crashes**: Analyze stop codes, read minidump logs, and execute system integrity repairs (SFC/DISM)
-- **Network & Connectivity**: Diagnose WLAN adapter drops, reset network stacks, and resolve DNS routing issues
-- **Hardware & Thermals**: Inspect component temperatures, thermal throttling, fan behavior, and battery wear
-- **Photo Inspection**: Upload images of hardware components, motherboard traces, or screen error codes
-- **Voice Diagnostics**: Record audio describing strange physical noises, coil whine, or fan bearing rattle`,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      },
-    ],
+    messages: [],
   };
 };
 
@@ -512,16 +496,25 @@ export default function App() {
           <main className="flex flex-1 flex-col overflow-hidden">
             {/* Chat messages viewport */}
             <div className="flex-1 overflow-y-auto divide-y divide-slate-800/40">
-              {currentSession?.messages.map((msg) => (
-                <ChatMessageItem
-                  key={msg.id}
-                  message={msg}
-                  settings={settings}
-                  isSpeaking={speakingMessageId === msg.id}
-                  onToggleMessageSpeech={handleToggleMessageSpeech}
-                  onOpenGeminiModal={() => setIsGeminiModalOpen(true)}
+              {(!currentSession || currentSession.messages.length === 0 || (currentSession.messages.length === 1 && currentSession.messages[0].role === "assistant" && currentSession.messages[0].content.includes("Diagnostic Modules Available"))) ? (
+                <EmptyChatState
+                  currentUser={currentUser}
+                  onSelectStarter={(prompt) => handleSendMessage(prompt)}
+                  onUploadPhotoClick={() => document.getElementById("btn-upload-photo")?.click()}
+                  onOpenPhotoStudio={() => setActiveTab("image_studio")}
                 />
-              ))}
+              ) : (
+                currentSession.messages.map((msg) => (
+                  <ChatMessageItem
+                    key={msg.id}
+                    message={msg}
+                    settings={settings}
+                    isSpeaking={speakingMessageId === msg.id}
+                    onToggleMessageSpeech={handleToggleMessageSpeech}
+                    onOpenGeminiModal={() => setIsGeminiModalOpen(true)}
+                  />
+                ))
+              )}
 
               {/* Loading Indicator when DARBS is analyzing */}
               {isLoading && (
@@ -558,7 +551,7 @@ export default function App() {
                 }))
               }
               onSelectPrompt={(p) => handleSendMessage(p)}
-              showStarterChips={currentSession?.messages.length <= 1}
+              showStarterChips={false}
             />
           </main>
         )}

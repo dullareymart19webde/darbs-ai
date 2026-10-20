@@ -305,7 +305,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex items-center justify-between rounded-lg bg-slate-900/80 p-2 text-[11px] text-slate-300">
             <div className="flex items-center gap-1.5">
               <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
-              <span>Cloud Firestore:</span>
+              <span>Cloud Sync:</span>
             </div>
             <span className="font-semibold text-emerald-400">Active</span>
           </div>
